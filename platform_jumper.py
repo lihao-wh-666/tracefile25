@@ -2,12 +2,36 @@ import pygame
 import sys
 import math
 import random
+import os
 
-pygame.init()
 
-SCREEN_WIDTH = 960
-SCREEN_HEIGHT = 640
-FPS = 60
+def _get_env_int(name, default):
+    try:
+        return int(os.environ.get(name, default))
+    except (ValueError, TypeError):
+        return default
+
+
+def _get_env_bool(name, default=False):
+    val = os.environ.get(name, "").strip().lower()
+    if val in ("1", "true", "yes", "y", "on"):
+        return True
+    if val in ("0", "false", "no", "n", "off"):
+        return False
+    return default
+
+
+HEADLESS = _get_env_bool("HEADLESS", False)
+HEALTHCHECK = _get_env_bool("HEALTHCHECK", False)
+HEALTHCHECK_MAX_FRAMES = _get_env_int("HEALTHCHECK_MAX_FRAMES", 300)
+
+if HEADLESS:
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+
+SCREEN_WIDTH = _get_env_int("SCREEN_WIDTH", 960)
+SCREEN_HEIGHT = _get_env_int("SCREEN_HEIGHT", 640)
+FPS = _get_env_int("FPS", 60)
 
 GRAVITY = 0.6
 JUMP_FORCE = -13.5
@@ -513,6 +537,10 @@ class Game:
         while running:
             self.tick += 1
 
+            if HEALTHCHECK and self.tick > HEALTHCHECK_MAX_FRAMES:
+                pygame.quit()
+                sys.exit(0)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
@@ -521,6 +549,20 @@ class Game:
                         running = False
 
             keys = pygame.key.get_pressed()
+
+            if HEADLESS and HEALTHCHECK:
+                sim_keys = {
+                    pygame.K_RIGHT: True,
+                    pygame.K_SPACE: self.tick % 120 < 10,
+                    pygame.K_UP: False,
+                    pygame.K_LEFT: False,
+                    pygame.K_a: False,
+                    pygame.K_d: True,
+                    pygame.K_w: False,
+                }
+                keys = type('K', (), {
+                    '__getitem__': lambda self, k: sim_keys.get(k, False)
+                })()
 
             old_on_ground = self.player.on_ground
             self.player.update(keys, self.platforms)
@@ -567,13 +609,17 @@ class Game:
 
             self._draw_hud()
 
-            pygame.display.flip()
-            self.clock.tick(FPS)
+            if not HEADLESS:
+                pygame.display.flip()
+                self.clock.tick(FPS)
+            else:
+                self.clock.tick(FPS)
 
         pygame.quit()
         sys.exit()
 
 
 if __name__ == "__main__":
+    pygame.init()
     game = Game()
     game.run()

@@ -1,0 +1,178 @@
+x-common-config: &common-config
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  read_only: false
+  cap_drop:
+    - ALL
+  cap_add:
+    - NET_BIND_SERVICE
+  networks:
+    - game-net
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+      tag: "{{.Name}}/{{.ID}}"
+
+services:
+  game-dev:
+    <<: *common-config
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12-slim}
+    container_name: platform-jumper-dev
+    hostname: game-dev
+    image: platform-jumper:dev
+    environment:
+      APP_ENV: development
+      PYTHONDONTWRITEBYTECODE: 1
+      PYTHONUNBUFFERED: 1
+      HEADLESS: "true"
+      ENABLE_VNC: "true"
+      ENABLE_WM: "true"
+      VNC_PORT: 5900
+      VNC_PASSWORD: ${VNC_PASSWORD:-}
+      SCREEN_WIDTH: ${SCREEN_WIDTH:-960}
+      SCREEN_HEIGHT: ${SCREEN_HEIGHT:-640}
+      FPS: ${FPS:-60}
+    ports:
+      - "${VNC_HOST_PORT:-5900}:5900"
+    volumes:
+      - ./:/app:ro
+      - dev-logs:/var/log
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+    mem_limit: ${DEV_MEM_LIMIT:-512m}
+    memswap_limit: ${DEV_MEM_LIMIT:-512m}
+    cpus: ${DEV_CPU_LIMIT:-1.0}
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      disable: false
+      test: ["CMD-SHELL", "HEALTHCHECK=true python platform_jumper.py || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 15s
+
+  game-test:
+    <<: *common-config
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: testing
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12-slim}
+    container_name: platform-jumper-test
+    hostname: game-test
+    image: platform-jumper:test
+    environment:
+      APP_ENV: testing
+      HEADLESS: "true"
+      HEALTHCHECK: "true"
+      HEALTHCHECK_MAX_FRAMES: 300
+      SCREEN_WIDTH: ${SCREEN_WIDTH:-960}
+      SCREEN_HEIGHT: ${SCREEN_HEIGHT:-640}
+      FPS: ${FPS:-60}
+    mem_limit: ${TEST_MEM_LIMIT:-256m}
+    memswap_limit: ${TEST_MEM_LIMIT:-256m}
+    cpus: ${TEST_CPU_LIMIT:-0.5}
+    restart: "no"
+
+  game-prod:
+    <<: *common-config
+    profiles: ["prod"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12-slim}
+    container_name: platform-jumper-prod
+    hostname: game-prod
+    image: platform-jumper:latest
+    environment:
+      APP_ENV: production
+      PYTHONOPTIMIZE: 2
+      HEADLESS: "true"
+      ENABLE_VNC: "true"
+      ENABLE_WM: "false"
+      VNC_PORT: 5900
+      VNC_PASSWORD: ${VNC_PASSWORD:-secret}
+      SCREEN_WIDTH: ${SCREEN_WIDTH:-960}
+      SCREEN_HEIGHT: ${SCREEN_HEIGHT:-640}
+      FPS: ${FPS:-60}
+    ports:
+      - "${VNC_HOST_PORT:-5900}:5900"
+    volumes:
+      - prod-data:/data
+      - prod-logs:/var/log
+    mem_limit: ${PROD_MEM_LIMIT:-512m}
+    memswap_limit: ${PROD_MEM_LIMIT:-512m}
+    cpus: ${PROD_CPU_LIMIT:-1.0}
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      disable: false
+      test: ["CMD-SHELL", "HEALTHCHECK=true python platform_jumper.py || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 128M
+          cpus: "0.25"
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+networks:
+  game-net:
+    name: platform-jumper-net
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${NETWORK_SUBNET:-172.28.0.0/16}
+    driver_opts:
+      com.docker.network.bridge.name: br-game
+      com.docker.network.bridge.enable_icc: "true"
+
+volumes:
+  dev-logs:
+    name: platform-jumper-dev-logs
+    driver: local
+  prod-data:
+    name: platform-jumper-prod-data
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PROD_DATA_PATH:-/srv/platform-jumper/data}
+      o: bind
+  prod-logs:
+    name: platform-jumper-prod-logs
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PROD_LOG_PATH:-/srv/platform-jumper/logs}
+      o: bind
