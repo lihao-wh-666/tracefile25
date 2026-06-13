@@ -29,6 +29,9 @@ from config import (
     MAX_JUMP_COUNT, MULTI_JUMP_FORCE, MULTI_JUMP_INTERVAL_FRAMES,
     LADDER_WIDTH, LADDER_COLOR, LADDER_RUNG_COLOR,
     LADDER_RUNG_SPACING, CLIMB_SPEED,
+    PORTAL_WIDTH, PORTAL_HEIGHT,
+    PORTAL_COLOR_INNER, PORTAL_COLOR_OUTER, PORTAL_COLOR_GLOW,
+    PORTAL_ACTIVATION_COINS, PORTAL_COOLDOWN_FRAMES,
 )
 
 
@@ -424,17 +427,15 @@ class Player:
             self.eye_blink -= 1
 
     def _try_enter_ladder(self, ladders, climb_up, climb_down):
-        """
-        尝试进入攀爬状态。
-
-        条件：玩家中心在梯子范围内，且按了上或下方向键。
-        进入后角色对齐到梯子中心，重置跳跃计数，停止当前速度。
-        """
         player_rect = self.get_rect()
         cx = self.x + self.width / 2
         for ladder in ladders:
-            if (player_rect.colliderect(ladder.rect)
-                    and (climb_up or climb_down)):
+            on_top = (
+                abs((self.y + self.height) - ladder.y) <= 2
+                and cx >= ladder.x
+                and cx <= ladder.x + ladder.width
+            )
+            if (player_rect.colliderect(ladder.rect) or on_top) and (climb_up or climb_down):
                 self.climbing = True
                 self.current_ladder = ladder
                 ladder_cx = ladder.x + ladder.width / 2
@@ -445,6 +446,8 @@ class Player:
                 self.coyote_time = 0
                 self.jump_buffer = 0
                 self.target_squash = SQUASH_ON_CLIMB
+                if on_top and climb_down:
+                    self.y = ladder.y
                 break
 
     def _update_climbing(self, climb_up, climb_down, climb_left, climb_right, platforms, ladders):
@@ -789,3 +792,162 @@ class Player:
             pygame.draw.circle(
                 surface, PLAYER_PUPIL, (int(ex2 + look_offset), int(eye_y)), 2
             )
+
+
+class Portal:
+    """
+    传送门实体类，实现关卡间或区域间的快速跳转。
+
+    核心特性:
+    - 激活条件：可配置收集金币数量作为激活门槛
+    - 视觉反馈：未激活时灰暗，激活后发光脉动 + 粒子特效
+    - 冷却机制：防止连续触发传送
+    - 目标配置：可指定目标关卡编号和目标位置坐标
+
+    属性:
+        x, y: 传送门左上角坐标
+        target_level: 目标关卡编号（-1 表示同关卡内传送）
+        target_x, target_y: 传送后的目标坐标
+        required_coins: 激活所需金币数量
+        activated: 是否已激活
+        cooldown: 冷却计时器（防止连传）
+        anim_phase: 动画相位（用于发光脉动）
+    """
+
+    def __init__(self, x, y, target_level, target_x, target_y, required_coins=PORTAL_ACTIVATION_COINS):
+        self.x = x
+        self.y = y
+        self.width = PORTAL_WIDTH
+        self.height = PORTAL_HEIGHT
+        self.target_level = target_level
+        self.target_x = target_x
+        self.target_y = target_y
+        self.required_coins = required_coins
+        self.activated = required_coins <= 0
+        self.cooldown = 0
+        self.anim_phase = 0.0
+
+    def get_rect(self):
+        """返回传送门碰撞检测矩形。"""
+        return pygame.Rect(self.x, self.y, self.width, self.height)
+
+    def update(self, player_score=0):
+        """
+        更新传送门状态。
+
+        Args:
+            player_score: 当前玩家金币/得分，用于判断是否满足激活条件
+        """
+        if self.cooldown > 0:
+            self.cooldown -= 1
+
+        if not self.activated and player_score >= self.required_coins * 10:
+            self.activated = True
+
+        self.anim_phase += 0.08
+
+    def can_trigger(self, player_rect, player_score=0):
+        """
+        检测是否可以触发传送。
+
+        条件:
+        1. 玩家矩形与传送门矩形重叠
+        2. 传送门已激活（满足金币条件）
+        3. 冷却时间已过
+
+        Args:
+            player_rect: 玩家碰撞矩形
+            player_score: 当前玩家得分
+
+        Returns:
+            bool: 是否可以触发传送
+        """
+        if not self.activated and player_score >= self.required_coins * 10:
+            self.activated = True
+        if not self.activated:
+            return False
+        if self.cooldown > 0:
+            return False
+        return self.get_rect().colliderect(player_rect)
+
+    def trigger(self):
+        """触发传送，启动冷却计时。"""
+        self.cooldown = PORTAL_COOLDOWN_FRAMES
+
+    def draw(self, surface, camera_x, tick):
+        """
+        绘制传送门。
+
+        未激活状态：灰暗半透明椭圆
+        激活状态：多层椭圆叠加发光脉动效果 + 粒子光点
+
+        Args:
+            surface: 目标绘制 Surface
+            camera_x: 相机水平偏移
+            tick: 全局帧计数器
+        """
+        sx = int(self.x - camera_x)
+        sy = int(self.y)
+        cx = sx + self.width // 2
+        cy = sy + self.height // 2
+
+        if sx + self.width < -50 or sx > SCREEN_WIDTH + 50:
+            return
+
+        if not self.activated:
+            r1, g1, b1 = PORTAL_COLOR_OUTER
+            dim_color = (r1 // 3, g1 // 3, b1 // 3)
+            pygame.draw.ellipse(
+                surface, dim_color,
+                (sx, sy, self.width, self.height),
+                4
+            )
+            inner_color = (r1 // 4, g1 // 4, b1 // 4)
+            pygame.draw.ellipse(
+                surface, inner_color,
+                (sx + 8, sy + 8, self.width - 16, self.height - 16)
+            )
+            return
+
+        pulse = (math.sin(self.anim_phase) + 1) * 0.5
+
+        glow_w = int(self.width * (1.0 + pulse * 0.15))
+        glow_h = int(self.height * (1.0 + pulse * 0.1))
+        glow_x = cx - glow_w // 2
+        glow_y = cy - glow_h // 2
+        glow_surf = pygame.Surface((glow_w, glow_h), pygame.SRCALPHA)
+        glow_alpha = int(80 + pulse * 60)
+        pygame.draw.ellipse(
+            glow_surf,
+            (*PORTAL_COLOR_GLOW, glow_alpha),
+            (0, 0, glow_w, glow_h)
+        )
+        surface.blit(glow_surf, (glow_x, glow_y))
+
+        pygame.draw.ellipse(
+            surface, PORTAL_COLOR_OUTER,
+            (sx, sy, self.width, self.height),
+            5
+        )
+
+        mid_w = self.width - 10
+        mid_h = self.height - 10
+        mid_x = sx + 5
+        mid_y = sy + 5
+        pygame.draw.ellipse(
+            surface, PORTAL_COLOR_INNER,
+            (mid_x, mid_y, mid_w, mid_h)
+        )
+
+        swirl_r = min(self.width, self.height) // 4
+        for i in range(3):
+            angle = self.anim_phase + i * (math.pi * 2 / 3)
+            px = cx + int(math.cos(angle) * swirl_r)
+            py = cy + int(math.sin(angle) * swirl_r * 0.7)
+            pygame.draw.circle(surface, PORTAL_COLOR_GLOW, (px, py), 3)
+
+        for i in range(2):
+            angle = -self.anim_phase * 1.5 + i * math.pi
+            px = cx + int(math.cos(angle) * swirl_r * 0.5)
+            py = cy + int(math.sin(angle) * swirl_r * 0.5 * 0.7)
+            pygame.draw.circle(surface, (255, 255, 255), (px, py), 2)
