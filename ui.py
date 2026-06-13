@@ -9,6 +9,7 @@ ui.py - 游戏 UI 组件模块
   - 视觉反馈：滑块填充、高亮、悬停效果
 """
 
+import os
 import pygame
 
 from config import (
@@ -20,6 +21,34 @@ from config import (
     VOLUME_SLIDER_BG, VOLUME_SLIDER_FG,
     VOLUME_SLIDER_KNOB, VOLUME_TEXT_COLOR,
 )
+
+
+def get_chinese_font(size):
+    """
+    获取支持中文显示的字体。
+
+    优先使用系统中的中文字体（微软雅黑、黑体、宋体等），
+    如果找不到则回退到 pygame 默认字体。
+    """
+    font_paths = [
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/msyhbd.ttc",
+        "C:/Windows/Fonts/simhei.ttf",
+        "C:/Windows/Fonts/simsun.ttc",
+        "/System/Library/Fonts/PingFang.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ]
+
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return pygame.font.Font(path, size)
+            except (pygame.error, OSError):
+                continue
+
+    return pygame.font.Font(None, size)
 
 
 class VolumeSlider:
@@ -258,20 +287,20 @@ class VolumePanel:
         )
         surface.blit(panel_surf, (self.x, self.y))
 
-        title = font.render("Audio Settings  [V]", True, VOLUME_TEXT_COLOR)
+        title = font.render("音频设置  [V]", True, VOLUME_TEXT_COLOR)
         title_x = self.x + (self.width - title.get_width()) // 2
         surface.blit(title, (title_x, self.y + 12))
 
-        bgm_label = small_font.render("Music:", True, VOLUME_TEXT_COLOR)
+        bgm_label = small_font.render("音乐:", True, VOLUME_TEXT_COLOR)
         surface.blit(bgm_label, (self.x + 15, self.y + 48))
 
-        sfx_label = small_font.render("SFX:", True, VOLUME_TEXT_COLOR)
+        sfx_label = small_font.render("音效:", True, VOLUME_TEXT_COLOR)
         surface.blit(sfx_label, (self.x + 15, self.y + 93))
 
         self.bgm_slider.draw(surface, small_font)
         self.sfx_slider.draw(surface, small_font)
 
-        hint = small_font.render("Drag sliders to adjust volume", True,
+        hint = small_font.render("拖动滑块调节音量", True,
                                  (180, 180, 220))
         hint_x = self.x + (self.width - hint.get_width()) // 2
         surface.blit(hint, (hint_x, self.y + self.height - 25))

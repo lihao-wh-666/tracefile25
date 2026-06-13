@@ -34,8 +34,8 @@ def main():
     pygame.init()
 
     if not HEADLESS and not HEALTHCHECK:
-        print("Platform Jumper 启动成功！")
-        print("  操作: ← → 或 A D 移动   空格/↑/W 跳跃   ↑↓攀爬   ESC 退出")
+        print("平台跳跃 启动成功！")
+        print("  操作: ← → 或 A D 移动   空格/↑/W 跳跃   ↑↓攀爬   ESC 暂停/退出")
 
     game = Game()
     game.run()

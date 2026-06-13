@@ -26,6 +26,40 @@ from config import (
 from audio import AudioManager
 
 
+def get_chinese_font(size):
+    """
+    获取支持中文显示的字体。
+
+    优先使用系统中的中文字体（微软雅黑、黑体、宋体等），
+    如果找不到则回退到 pygame 默认字体。
+
+    Args:
+        size: 字体大小
+
+    Returns:
+        pygame.font.Font: 支持中文的字体对象
+    """
+    font_paths = [
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/msyhbd.ttc",
+        "C:/Windows/Fonts/simhei.ttf",
+        "C:/Windows/Fonts/simsun.ttc",
+        "/System/Library/Fonts/PingFang.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    ]
+
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return pygame.font.Font(path, size)
+            except (pygame.error, OSError):
+                continue
+
+    return pygame.font.Font(None, size)
+
+
 MENU_BG_COLOR = (20, 20, 40)
 MENU_PANEL_BG = (40, 40, 70, 240)
 MENU_PANEL_BORDER = (100, 150, 255)
@@ -630,7 +664,7 @@ class Menu:
             btn.draw(surface, normal_font)
 
         hint = small_font.render(
-            "↑↓ Navigate   Enter Select   ESC Back",
+            "↑↓ 导航   Enter 选择   ESC 返回",
             True, MENU_HINT_COLOR
         )
         hint_x = self._panel_x + (self.panel_width - hint.get_width()) // 2
@@ -650,7 +684,7 @@ class MainMenu(Menu):
     """
 
     def __init__(self, manager):
-        super().__init__(manager, "Platform Jumper")
+        super().__init__(manager, "平台跳跃")
         self.panel_height = 480
 
         self.buttons = [
@@ -663,8 +697,8 @@ class MainMenu(Menu):
         ]
 
         self._layout_buttons()
-        self._title_font = pygame.font.Font(None, 64)
-        self._subtitle_font = pygame.font.Font(None, 28)
+        self._title_font = get_chinese_font(64)
+        self._subtitle_font = get_chinese_font(28)
 
     def refresh_save_button(self):
         """刷新加载游戏按钮的启用状态。"""
@@ -707,7 +741,7 @@ class MainMenu(Menu):
         super().draw(surface, big_font, normal_font, small_font)
 
         subtitle = self._subtitle_font.render(
-            "Jump, Collect, Explore!", True, (180, 200, 255)
+            "跳跃，收集，探索！", True, (180, 200, 255)
         )
         sub_x = self._panel_x + (self.panel_width - subtitle.get_width()) // 2
         surface.blit(subtitle, (sub_x, self._panel_y + 95))
@@ -923,9 +957,9 @@ class GameOverMenu(Menu):
         for i, btn in enumerate(self.buttons):
             btn.rect.y = self._panel_y + 340 + i * 55
 
-        self._title_font = pygame.font.Font(None, 56)
-        self._score_font = pygame.font.Font(None, 42)
-        self._small_font = pygame.font.Font(None, 26)
+        self._title_font = get_chinese_font(56)
+        self._score_font = get_chinese_font(42)
+        self._small_font = get_chinese_font(26)
 
     def set_score(self, score):
         """
@@ -1074,8 +1108,8 @@ class LeaderboardMenu(Menu):
         self.buttons[0].rect.y = self._panel_y + self.panel_height - 70
         self.buttons[0].rect.x = self._panel_x + (self.panel_width - 200) // 2
 
-        self._rank_font = pygame.font.Font(None, 24)
-        self._header_font = pygame.font.Font(None, 28)
+        self._rank_font = get_chinese_font(24)
+        self._header_font = get_chinese_font(28)
 
     def refresh(self):
         """刷新排行榜数据。"""
@@ -1099,7 +1133,7 @@ class LeaderboardMenu(Menu):
         col3_x = self._panel_x + 280
         col4_x = self._panel_x + 400
 
-        headers = ["#", "昵称", "得分", "日期"]
+        headers = ["排名", "昵称", "得分", "日期"]
         header_x = [col1_x, col2_x, col3_x, col4_x]
         for i, h in enumerate(headers):
             text = self._header_font.render(h, True, (180, 200, 255))

@@ -27,7 +27,8 @@ from config import SCREEN_WIDTH, SCREEN_HEIGHT
 from menus import (
     GameState, Button, Slider, StorageManager,
     Menu, MainMenu, SettingsMenu, PauseMenu,
-    GameOverMenu, LeaderboardMenu, MenuManager
+    GameOverMenu, LeaderboardMenu, MenuManager,
+    get_chinese_font
 )
 
 
@@ -230,7 +231,7 @@ def test_all_menus():
     manager = MenuManager(mock_game)
 
     main_menu = MainMenu(manager)
-    assert main_menu.title == "Platform Jumper"
+    assert main_menu.title == "平台跳跃"
     assert len(main_menu.buttons) == 5
     print("  ✓ MainMenu 初始化正常")
 
@@ -321,6 +322,36 @@ def test_state_enum():
     print("  ✓ GameState 所有测试通过")
 
 
+def test_chinese_font():
+    """测试中文字体加载。"""
+    print("\n测试中文字体加载...")
+
+    font_small = get_chinese_font(24)
+    font_medium = get_chinese_font(36)
+    font_large = get_chinese_font(64)
+
+    assert font_small is not None
+    assert font_medium is not None
+    assert font_large is not None
+
+    test_text = "你好，世界！"
+    surf_small = font_small.render(test_text, True, (255, 255, 255))
+    surf_medium = font_medium.render(test_text, True, (255, 255, 255))
+    surf_large = font_large.render(test_text, True, (255, 255, 255))
+
+    assert surf_small is not None
+    assert surf_small.get_width() > 0
+    assert surf_large.get_height() > surf_medium.get_height()
+    assert surf_medium.get_height() > surf_small.get_height()
+
+    print("  ✓ 小字体渲染正常")
+    print("  ✓ 中字体渲染正常")
+    print("  ✓ 大字体渲染正常")
+    print("  ✓ 字体大小缩放正常")
+
+    print("  ✓ 中文字体所有测试通过")
+
+
 def main():
     """运行所有测试。"""
     print("=" * 60)
@@ -329,6 +360,7 @@ def main():
 
     try:
         test_state_enum()
+        test_chinese_font()
         test_storage_manager()
         test_button()
         test_slider()

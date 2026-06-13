@@ -49,7 +49,7 @@ from entities import Particle, Coin, Platform, Player, Ladder, Portal
 from levels import get_level_config, LEVEL_BUILDERS
 from audio import AudioManager
 from ui import VolumePanel
-from menus import GameState, MenuManager
+from menus import GameState, MenuManager, get_chinese_font
 
 
 class Game:
@@ -86,7 +86,7 @@ class Game:
 
     def __init__(self):
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Platform Jumper")
+        pygame.display.set_caption("平台跳跃")
         self.clock = pygame.time.Clock()
         self.tick = 0
         self.score = 0
@@ -108,9 +108,9 @@ class Game:
         self.loading_progress = 0.0
 
         self.player = Player(PLAYER_SPAWN_X, PLAYER_SPAWN_Y)
-        self.font = pygame.font.Font(None, 26)
-        self.big_font = pygame.font.Font(None, 52)
-        self.title_font = pygame.font.Font(None, 72)
+        self.font = get_chinese_font(26)
+        self.big_font = get_chinese_font(52)
+        self.title_font = get_chinese_font(72)
 
         self._sky_surface = None
         self._stars_surface = None
@@ -572,19 +572,19 @@ class Game:
 
     def _draw_hud(self):
         """绘制抬头显示（HUD）。"""
-        coin_text = self.font.render(f"Coins: {self.score}", True, WHITE)
-        shadow_text = self.font.render(f"Coins: {self.score}", True, BLACK)
+        coin_text = self.font.render(f"金币: {self.score}", True, WHITE)
+        shadow_text = self.font.render(f"金币: {self.score}", True, BLACK)
         self.screen.blit(shadow_text, (22, 17))
         self.screen.blit(coin_text, (20, 15))
 
         if self.level_config:
             level_num = self.current_level + 1
             level_text = self.font.render(
-                f"Level {level_num}/{TOTAL_LEVELS}: {self.level_config.name}",
+                f"第 {level_num}/{TOTAL_LEVELS} 关: {self.level_config.name}",
                 True, WHITE,
             )
             level_shadow = self.font.render(
-                f"Level {level_num}/{TOTAL_LEVELS}: {self.level_config.name}",
+                f"第 {level_num}/{TOTAL_LEVELS} 关: {self.level_config.name}",
                 True, BLACK,
             )
             text_x = (SCREEN_WIDTH - level_text.get_width()) // 2
@@ -592,13 +592,13 @@ class Game:
             self.screen.blit(level_text, (text_x, 15))
 
         hint = self.font.render(
-            "Arrows/WASD: Move   Space: Jump   Up/Down: Ladder   Enter Portal: Teleport",
+            "方向键/WASD: 移动   空格: 跳跃   上下: 爬梯   传送门: 传送",
             True, (50, 50, 80),
         )
         self.screen.blit(hint, (SCREEN_WIDTH - hint.get_width() - 15, 15))
 
         audio_hint = self.font.render(
-            "[V] Audio Settings",
+            "[V] 音频设置",
             True, (80, 80, 120) if not self.volume_panel.visible else (100, 200, 255),
         )
         self.screen.blit(audio_hint, (SCREEN_WIDTH - audio_hint.get_width() - 15, 40))
@@ -627,7 +627,7 @@ class Game:
         target_config = get_level_config(self.pending_level)
         level_num = self.pending_level + 1
 
-        title = self.title_font.render(f"Level {level_num}", True, LOADING_TEXT_COLOR)
+        title = self.title_font.render(f"第 {level_num} 关", True, LOADING_TEXT_COLOR)
         title_x = (SCREEN_WIDTH - title.get_width()) // 2
         self.screen.blit(title, (title_x, SCREEN_HEIGHT // 2 - 140))
 
@@ -656,7 +656,7 @@ class Game:
             )
 
         pct = int(self.loading_progress * 100)
-        pct_text = self.font.render(f"Loading... {pct}%", True, LOADING_TEXT_COLOR)
+        pct_text = self.font.render(f"加载中... {pct}%", True, LOADING_TEXT_COLOR)
         pct_x = (SCREEN_WIDTH - pct_text.get_width()) // 2
         self.screen.blit(pct_text, (pct_x, bar_y + LOADING_BAR_HEIGHT + 15))
 
