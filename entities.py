@@ -23,9 +23,12 @@ from config import (
     JUMP_BUFFER_FRAMES, COYOTE_TIME_FRAMES, SHORT_JUMP_MULTIPLIER,
     SHORT_JUMP_THRESHOLD,
     SQUASH_INTERPOLATION, SQUASH_ON_JUMP, SQUASH_ON_FALL,
-    SQUASH_ON_LAND, SQUASH_NORMAL,
+    SQUASH_ON_LAND, SQUASH_NORMAL, SQUASH_ON_CLIMB,
     RUN_ANIM_SPEED, BLINK_INTERVAL, BLINK_DURATION,
     LEVEL_WIDTH, FALL_RESPAWN_Y,
+    MAX_JUMP_COUNT, MULTI_JUMP_FORCE, MULTI_JUMP_INTERVAL_FRAMES,
+    LADDER_WIDTH, LADDER_COLOR, LADDER_RUNG_COLOR,
+    LADDER_RUNG_SPACING, CLIMB_SPEED,
 )
 
 
@@ -253,15 +256,66 @@ class Platform:
                 )
 
 
+class Ladder:
+    """
+    梯子对象，允许玩家上下攀爬。
+
+    属性:
+        x: 梯子左侧 x 坐标
+        y: 梯子顶部 y 坐标
+        width: 梯子宽度
+        height: 梯子总高度
+        rect: 碰撞检测用矩形
+    """
+
+    def __init__(self, x, y, height):
+        self.x = x
+        self.y = y
+        self.width = LADDER_WIDTH
+        self.height = height
+        self.rect = pygame.Rect(x, y, self.width, height)
+
+    def draw(self, surface, camera_x):
+        sx = int(self.x - camera_x)
+        sy = int(self.y)
+
+        if sx + self.width < 0 or sx > SCREEN_WIDTH:
+            return
+
+        pygame.draw.rect(
+            surface,
+            LADDER_COLOR,
+            (sx, sy, 4, self.height),
+        )
+        pygame.draw.rect(
+            surface,
+            LADDER_COLOR,
+            (sx + self.width - 4, sy, 4, self.height),
+        )
+
+        rung_y = sy
+        while rung_y < sy + self.height:
+            pygame.draw.line(
+                surface,
+                LADDER_RUNG_COLOR,
+                (sx + 3, rung_y),
+                (sx + self.width - 4, rung_y),
+                3,
+            )
+            rung_y += LADDER_RUNG_SPACING
+
+
 class Player:
     """
     玩家角色类，处理输入、物理运动、碰撞和动画。
-    
+
     核心特性:
     - 物理：加速度 + 摩擦力的平滑移动
     - 跳跃：跳跃缓冲 + 土狼时间（增加操作容错）
+    - 多段跳：空中连续跳跃，可配置最大次数和力度
+    - 攀爬：与梯子交互的上下攀爬控制
     - 短跳：松开跳跃键时减速（可控制跳跃高度）
-    - 视觉：挤压拉伸、跑步动画、随机眨眼
+    - 视觉：挤压拉伸、跑步动画、攀爬动画、随机眨眼
     - 碰撞：水平/垂直分离解析，防止穿墙
     """
 
@@ -284,6 +338,13 @@ class Player:
         self.jump_buffer = 0
         self.coyote_time = 0
 
+        self.jump_count = 0
+        self.multi_jump_cooldown = 0
+
+        self.climbing = False
+        self.current_ladder = None
+        self.climb_anim = 0
+
         self.squash_stretch = 1.0
         self.target_squash = 1.0
 
@@ -295,24 +356,159 @@ class Player:
         """返回玩家碰撞矩形。"""
         return pygame.Rect(self.x, self.y, self.width, self.height)
 
-    def update(self, keys, platforms):
+    def update(self, keys, platforms, ladders=None):
         """
         更新玩家状态（每帧调用）。
-        
+
         处理流程:
-        1. 读取水平方向输入，应用加速度/摩擦力
-        2. 读取跳跃输入，管理跳跃缓冲
-        3. 更新土狼时间（离开平台后短时间内仍可跳跃）
-        4. 执行跳跃（缓冲 + 土狼时间窗口）
-        5. 应用短跳逻辑和重力
-        6. 更新挤压拉伸动画目标
-        7. 先水平移动 + 碰撞，再垂直移动 + 碰撞
-        8. 边界限制 + 掉落重生
-        9. 眨眼计时器
-        
+        1. 更新多段跳冷却计时器
+        2. 检测梯子交互，处理攀爬进入/退出
+        3. 攀爬模式下处理上下移动和脱离
+        4. 读取水平方向输入，应用加速度/摩擦力
+        5. 读取跳跃输入，管理跳跃缓冲
+        6. 更新土狼时间
+        7. 执行跳跃（地面跳 / 空中多段跳）
+        8. 应用短跳逻辑和重力
+        9. 更新挤压拉伸动画目标
+        10. 先水平移动 + 碰撞，再垂直移动 + 碰撞
+        11. 边界限制 + 掉落重生
+        12. 眨眼计时器
+
         Args:
             keys: pygame.key.get_pressed() 返回的按键状态序列
             platforms: 所有平台对象列表
+            ladders: 所有梯子对象列表（可选）
+        """
+        if ladders is None:
+            ladders = []
+
+        if self.multi_jump_cooldown > 0:
+            self.multi_jump_cooldown -= 1
+
+        climb_up = keys[pygame.K_UP] or keys[pygame.K_w]
+        climb_down = keys[pygame.K_DOWN] or keys[pygame.K_s]
+
+        if not self.climbing:
+            self._try_enter_ladder(ladders, climb_up, climb_down)
+
+        if self.climbing:
+            self._update_climbing(climb_up, climb_down, platforms, ladders)
+        else:
+            self._update_normal(keys, platforms, climb_up)
+
+        if self.x < 0:
+            self.x = 0
+            self.vx = 0
+        if self.x + self.width > LEVEL_WIDTH:
+            self.x = LEVEL_WIDTH - self.width
+            self.vx = 0
+
+        if self.y > FALL_RESPAWN_Y:
+            self.x = self.start_x
+            self.y = 0
+            self.vx = 0
+            self.vy = 0
+            self.climbing = False
+            self.current_ladder = None
+            self.jump_count = 0
+
+        self.blink_timer += 1
+        if self.blink_timer > BLINK_INTERVAL:
+            self.eye_blink = BLINK_DURATION
+            self.blink_timer = 0
+        if self.eye_blink > 0:
+            self.eye_blink -= 1
+
+    def _try_enter_ladder(self, ladders, climb_up, climb_down):
+        """
+        尝试进入攀爬状态。
+
+        条件：玩家中心在梯子范围内，且按了上或下方向键。
+        进入后重置跳跃计数，停止当前速度。
+        """
+        player_rect = self.get_rect()
+        cx = self.x + self.width / 2
+        for ladder in ladders:
+            if (player_rect.colliderect(ladder.rect)
+                    and (climb_up or climb_down)):
+                self.climbing = True
+                self.current_ladder = ladder
+                self.vx = 0
+                self.vy = 0
+                self.jump_count = 0
+                self.coyote_time = 0
+                self.jump_buffer = 0
+                self.target_squash = SQUASH_ON_CLIMB
+                break
+
+    def _update_climbing(self, climb_up, climb_down, platforms, ladders):
+        """
+        更新攀爬状态。
+
+        逻辑:
+        - 按上/下键以固定速度上下移动
+        - 左右键脱离梯子（水平方向移动）
+        - 到达梯子顶部自动脱离并站到顶部平台
+        - 到达梯子底部且在地面上自动脱离
+        - 按跳跃键脱离梯子并进入跳跃状态
+        - 攀爬动画帧更新
+        """
+        want_jump = pygame.key.get_pressed()[pygame.K_SPACE]
+
+        if want_jump and not self.jump_pressed:
+            self.climbing = False
+            self.current_ladder = None
+            self.vy = JUMP_FORCE
+            self.jump_count = 1
+            self.on_ground = False
+            self.jump_pressed = True
+            self.target_squash = SQUASH_ON_JUMP
+            return
+
+        self.vy = 0
+        self.vx = 0
+
+        if climb_up:
+            self.vy = -CLIMB_SPEED
+            self.climb_anim += 0.15
+        elif climb_down:
+            self.vy = CLIMB_SPEED
+            self.climb_anim += 0.15
+
+        self.y += self.vy
+
+        ladder = self.current_ladder
+        if ladder is not None:
+            if self.y < ladder.y - self.height:
+                self.y = ladder.y - self.height
+                self.climbing = False
+                self.current_ladder = None
+                self.on_ground = False
+                self.vy = 0
+                self._resolve_vertical(platforms, False)
+
+        self._resolve_vertical(platforms, self.on_ground)
+
+        player_rect = self.get_rect()
+        still_on_ladder = False
+        if self.current_ladder is not None:
+            if player_rect.colliderect(self.current_ladder.rect):
+                still_on_ladder = True
+
+        if not still_on_ladder:
+            self.climbing = False
+            self.current_ladder = None
+
+        if not climb_up and not climb_down:
+            self.climb_anim += 0.02
+
+        self.target_squash = SQUASH_ON_CLIMB
+
+    def _update_normal(self, keys, platforms, climb_up):
+        """
+        更新正常（非攀爬）状态。
+
+        包含完整的水平移动、多段跳、重力、碰撞逻辑。
         """
         move_x = 0
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
@@ -348,15 +544,25 @@ class Player:
 
         if self.on_ground:
             self.coyote_time = COYOTE_TIME_FRAMES
+            self.jump_count = 0
         else:
             self.coyote_time = max(0, self.coyote_time - 1)
 
-        if self.jump_buffer > 0 and self.coyote_time > 0:
+        if self.jump_buffer > 0 and self.coyote_time > 0 and self.jump_count == 0:
             self.vy = JUMP_FORCE
             self.on_ground = False
             self.coyote_time = 0
             self.jump_buffer = 0
+            self.jump_count = 1
             self.target_squash = SQUASH_ON_JUMP
+        elif self.jump_buffer > 0 and not self.on_ground and self.jump_count > 0:
+            if (self.jump_count < MAX_JUMP_COUNT
+                    and self.multi_jump_cooldown <= 0):
+                self.vy = MULTI_JUMP_FORCE
+                self.jump_buffer = 0
+                self.jump_count += 1
+                self.multi_jump_cooldown = MULTI_JUMP_INTERVAL_FRAMES
+                self.target_squash = SQUASH_ON_JUMP
 
         if not want_jump and self.vy < SHORT_JUMP_THRESHOLD:
             self.vy *= SHORT_JUMP_MULTIPLIER
@@ -381,26 +587,6 @@ class Player:
         was_on_ground = self.on_ground
         self.on_ground = False
         self._resolve_vertical(platforms, was_on_ground)
-
-        if self.x < 0:
-            self.x = 0
-            self.vx = 0
-        if self.x + self.width > LEVEL_WIDTH:
-            self.x = LEVEL_WIDTH - self.width
-            self.vx = 0
-
-        if self.y > FALL_RESPAWN_Y:
-            self.x = self.start_x
-            self.y = 0
-            self.vx = 0
-            self.vy = 0
-
-        self.blink_timer += 1
-        if self.blink_timer > BLINK_INTERVAL:
-            self.eye_blink = BLINK_DURATION
-            self.blink_timer = 0
-        if self.eye_blink > 0:
-            self.eye_blink -= 1
 
     def _resolve_horizontal(self, platforms):
         """
@@ -450,15 +636,17 @@ class Player:
     def draw(self, surface, camera_x):
         """
         绘制玩家角色。
-        
+
         包含以下视觉层次：
         1. 阴影（偏移深色背景）
         2. 身体主色 + 顶部高光
         3. 脚部（仅跑步时）
-        4. 眼睛（含眨眼动画和朝向偏移）
-        
+        4. 手臂（攀爬时显示交替摆臂动画）
+        5. 眼睛（含眨眼动画和朝向偏移）
+
         整体应用挤压拉伸变换模拟卡通弹性。
-        
+        攀爬状态下身体会有微妙的左右摆动。
+
         Args:
             surface: 目标绘制 Surface
             camera_x: 相机水平偏移量
@@ -466,11 +654,20 @@ class Player:
         sx = self.x - camera_x
         sy = self.y
 
+        if self.climbing:
+            self.squash_stretch += (
+                SQUASH_ON_CLIMB - self.squash_stretch
+            ) * SQUASH_INTERPOLATION
+
         stretch_x = 1 / self.squash_stretch
         stretch_y = self.squash_stretch
 
         cx = sx + self.width / 2
         cy = sy + self.height / 2
+
+        if self.climbing:
+            sway = math.sin(self.climb_anim) * 2
+            cx += sway
 
         draw_w = self.width * stretch_x
         draw_h = self.height * stretch_y
@@ -499,7 +696,27 @@ class Player:
         )
         pygame.draw.rect(surface, PLAYER_LIGHT, highlight_rect, border_radius=3)
 
-        if self.on_ground and abs(self.vx) > 0.5:
+        if self.climbing:
+            arm_swing = math.sin(self.climb_anim * 2) * 6
+            arm_y_top = body_rect.y + body_rect.height * 0.3
+            arm_y_bot = body_rect.y + body_rect.height * 0.7
+            left_arm_x = body_rect.centerx - draw_w / 2 - 3
+            right_arm_x = body_rect.centerx + draw_w / 2 + 3
+            pygame.draw.line(
+                surface,
+                PLAYER_DARK,
+                (int(left_arm_x), int(arm_y_top - arm_swing)),
+                (int(left_arm_x), int(arm_y_bot - arm_swing)),
+                3,
+            )
+            pygame.draw.line(
+                surface,
+                PLAYER_DARK,
+                (int(right_arm_x), int(arm_y_top + arm_swing)),
+                (int(right_arm_x), int(arm_y_bot + arm_swing)),
+                3,
+            )
+        elif self.on_ground and abs(self.vx) > 0.5:
             leg_offset = math.sin(self.run_anim) * 3
             foot_y = body_rect.bottom
             foot_lx = body_rect.centerx - 5 + leg_offset

@@ -33,7 +33,7 @@ from config import (
     LEVEL_WIDTH, PLAYER_SPAWN_X, PLAYER_SPAWN_Y,
 )
 
-from entities import Particle, Coin, Platform, Player
+from entities import Particle, Coin, Platform, Player, Ladder
 
 
 class Game:
@@ -68,6 +68,7 @@ class Game:
 
         self.platforms = []
         self.coins = []
+        self.ladders = []
         self._build_level()
 
         self.player = Player(PLAYER_SPAWN_X, PLAYER_SPAWN_Y)
@@ -218,6 +219,17 @@ class Game:
         for x, y in coin_positions:
             self.coins.append(Coin(x, y))
 
+        ladder_specs = [
+            (440, 350, 250),
+            (850, 260, 340),
+            (1300, 300, 300),
+            (1750, 280, 320),
+            (2150, 250, 350),
+            (2650, 180, 420),
+        ]
+        for x, y, h in ladder_specs:
+            self.ladders.append(Ladder(x, y, h))
+
     def _spawn_particles(
         self, x, y, count, colors=PARTICLE_COLORS,
         spread=3, life=20, size=3
@@ -347,7 +359,7 @@ class Game:
         self.screen.blit(coin_text, (20, 15))
 
         hint = self.font.render(
-            "Arrow/WASD: Move   Space: Jump", True, (50, 50, 80)
+            "Arrows/WASD: Move   Space: Jump   Up/Down: Ladder", True, (50, 50, 80)
         )
         self.screen.blit(hint, (SCREEN_WIDTH - hint.get_width() - 15, 15))
 
@@ -364,11 +376,13 @@ class Game:
         sim_keys = {
             pygame.K_RIGHT: True,
             pygame.K_SPACE: self.tick % 120 < 10,
-            pygame.K_UP: False,
+            pygame.K_UP: self.tick % 200 < 30,
+            pygame.K_DOWN: self.tick % 200 >= 30 and self.tick % 200 < 60,
             pygame.K_LEFT: False,
             pygame.K_a: False,
             pygame.K_d: True,
             pygame.K_w: False,
+            pygame.K_s: False,
         }
 
         class _KeyProxy:
@@ -409,7 +423,7 @@ class Game:
             keys: 按键状态（真实或模拟）
         """
         old_on_ground = self.player.on_ground
-        self.player.update(keys, self.platforms)
+        self.player.update(keys, self.platforms, self.ladders)
 
         if self.player.on_ground and not old_on_ground and self.player.vy == 0:
             self._spawn_particles(
@@ -467,6 +481,9 @@ class Game:
 
         for plat in self.platforms:
             plat.draw(self.screen, self.camera_x)
+
+        for ladder in self.ladders:
+            ladder.draw(self.screen, self.camera_x)
 
         for coin in self.coins:
             coin.draw(self.screen, self.camera_x, self.tick)

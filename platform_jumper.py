@@ -10,7 +10,8 @@ platform_jumper.py - 平台跳跃游戏主入口
 
 操作说明:
     - 方向键 ←/→ 或 A/D  左右移动
-    - 空格 / ↑ / W         跳跃（支持短跳）
+    - 空格 / ↑ / W         跳跃（支持多段跳）
+    - ↑ / ↓ / W / S        攀爬梯子
     - ESC                   退出游戏
 
 支持的环境变量:
@@ -34,7 +35,7 @@ def main():
 
     if not HEADLESS and not HEALTHCHECK:
         print("Platform Jumper 启动成功！")
-        print("  操作: ← → 或 A D 移动   空格/↑/W 跳跃   ESC 退出")
+        print("  操作: ← → 或 A D 移动   空格/↑/W 跳跃   ↑↓攀爬   ESC 退出")
 
     game = Game()
     game.run()
