@@ -387,12 +387,14 @@ class Player:
 
         climb_up = keys[pygame.K_UP] or keys[pygame.K_w]
         climb_down = keys[pygame.K_DOWN] or keys[pygame.K_s]
+        climb_left = keys[pygame.K_LEFT] or keys[pygame.K_a]
+        climb_right = keys[pygame.K_RIGHT] or keys[pygame.K_d]
 
         if not self.climbing:
             self._try_enter_ladder(ladders, climb_up, climb_down)
 
         if self.climbing:
-            self._update_climbing(climb_up, climb_down, platforms, ladders)
+            self._update_climbing(climb_up, climb_down, climb_left, climb_right, platforms, ladders)
         else:
             self._update_normal(keys, platforms, climb_up)
 
@@ -424,7 +426,7 @@ class Player:
         尝试进入攀爬状态。
 
         条件：玩家中心在梯子范围内，且按了上或下方向键。
-        进入后重置跳跃计数，停止当前速度。
+        进入后角色对齐到梯子中心，重置跳跃计数，停止当前速度。
         """
         player_rect = self.get_rect()
         cx = self.x + self.width / 2
@@ -433,6 +435,8 @@ class Player:
                     and (climb_up or climb_down)):
                 self.climbing = True
                 self.current_ladder = ladder
+                ladder_cx = ladder.x + ladder.width / 2
+                self.x = ladder_cx - self.width / 2
                 self.vx = 0
                 self.vy = 0
                 self.jump_count = 0
@@ -441,19 +445,31 @@ class Player:
                 self.target_squash = SQUASH_ON_CLIMB
                 break
 
-    def _update_climbing(self, climb_up, climb_down, platforms, ladders):
+    def _update_climbing(self, climb_up, climb_down, climb_left, climb_right, platforms, ladders):
         """
         更新攀爬状态。
 
         逻辑:
         - 按上/下键以固定速度上下移动
-        - 左右键脱离梯子（水平方向移动）
+        - 按左右方向键脱离梯子（水平方向移动）
         - 到达梯子顶部自动脱离并站到顶部平台
         - 到达梯子底部且在地面上自动脱离
         - 按跳跃键脱离梯子并进入跳跃状态
         - 攀爬动画帧更新
         """
         want_jump = pygame.key.get_pressed()[pygame.K_SPACE]
+
+        if climb_left or climb_right:
+            self.climbing = False
+            self.current_ladder = None
+            if climb_left:
+                self.vx = -MOVE_SPEED * 0.8
+                self.facing_right = False
+            else:
+                self.vx = MOVE_SPEED * 0.8
+                self.facing_right = True
+            self.on_ground = False
+            return
 
         if want_jump and not self.jump_pressed:
             self.climbing = False
