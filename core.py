@@ -8,16 +8,18 @@ core.py - 游戏核心模块
 - 关卡数据构建
 - 输入事件处理与健康检查模拟输入
 - 游戏主循环（更新 → 渲染 → 计时）
-- 背景层绘制（天空、山脉、云朵）
+- 背景层绘制（天空、山脉、云朵、星空、太阳、月亮）
 - HUD 绘制
 - 碰撞检测（金币收集、传送门触发）
 
 性能优化:
 - 天空渐变预渲染为 Surface（避免每帧 640+ 次画线）
 - 云朵预渲染为带透明度的 Surface（避免每帧重复创建 Surface 与绘制椭圆）
+- 星空预渲染为 Surface（避免每帧重新计算）
 """
 
 import sys
+import math
 import random
 import pygame
 
@@ -37,6 +39,9 @@ from config import (
     LOADING_BAR_WIDTH, LOADING_BAR_HEIGHT,
     LOADING_BAR_BG, LOADING_BAR_FG, LOADING_TEXT_COLOR,
     TOTAL_LEVELS,
+    GROUND_COLOR, DIRT_COLOR, PLATFORM_COLOR, PLATFORM_TOP_COLOR,
+    PLATFORM_HIGHLIGHT, GRASS_DARK, GRASS_LIGHT,
+    GRASS_TUFT_DARK, GRASS_TUFT_LIGHT, PLATFORM_GRASS_SEED,
 )
 
 from entities import Particle, Coin, Platform, Player, Ladder, Portal
@@ -71,6 +76,7 @@ class Game:
         clouds: 云朵数据 + 预渲染 Surface 列表
         bg_mountains: 背景山脉数据列表
         _sky_surface: 预渲染的天空渐变 Surface（性能优化）
+        _stars_surface: 预渲染的星空 Surface
         current_level: 当前关卡编号
         game_state: 当前游戏状态（playing/transitioning/loading）
         transition_frame: 过渡动画帧计数器
@@ -110,6 +116,7 @@ class Game:
         self.title_font = pygame.font.Font(None, 72)
 
         self._sky_surface = None
+        self._stars_surface = None
         self.clouds = []
         self.bg_mountains = []
 
@@ -118,10 +125,6 @@ class Game:
     def _build_sky_surface(self, sky_top, sky_bottom):
         """
         预渲染天空渐变 Surface。
-
-        优化原因：原代码每帧循环 SCREEN_HEIGHT 次绘制水平线，
-        在 60FPS 下每秒执行 38400+ 次 pygame.draw.line。
-        改为启动时一次性构建渐变 Surface，每帧仅 blit 一次。
 
         Args:
             sky_top: 天空顶部渐变颜色
@@ -147,15 +150,47 @@ class Game:
             pygame.draw.line(surface, color, (0, y), (SCREEN_WIDTH, y))
         return surface
 
-    def _build_clouds(self):
+    def _build_stars_surface(self, star_count, star_seed):
+        """
+        预渲染星空 Surface。
+
+        星星随机分布在天空中，大小和亮度各不相同。
+        部分星星带有闪烁效果。
+
+        Args:
+            star_count: 星星数量
+            star_seed: 随机种子
+
+        Returns:
+            预渲染完成带透明度的星空 Surface，若 star_count 为 0 返回 None
+        """
+        if star_count <= 0:
+            return None
+
+        surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        rng = random.Random(star_seed)
+        for _ in range(star_count):
+            sx = rng.randint(0, SCREEN_WIDTH)
+            sy = rng.randint(0, int(SCREEN_HEIGHT * 0.65))
+            size = rng.choice([1, 1, 1, 2, 2, 3])
+            brightness = rng.randint(150, 255)
+            color = (brightness, brightness, min(255, brightness + 30), brightness)
+            if size == 1:
+                surface.set_at((sx, sy), color)
+            else:
+                pygame.draw.circle(surface, color, (sx, sy), size)
+        return surface
+
+    def _build_clouds(self, cloud_color, alpha_inner, alpha_outer):
         """
         构建并预渲染云朵数据。
 
-        每个云朵包含：
-        - x, y: 世界坐标与垂直位置
-        - w, h: 尺寸
-        - speed: 水平飘移速度
-        - surface: 预渲染的带透明度云朵图像
+        云朵固定在屏幕空间，仅水平缓慢飘移，不随相机移动。
+
+        Args:
+            cloud_color: 云朵颜色
+            alpha_inner: 内层透明度
+            alpha_outer: 外层透明度
 
         Returns:
             云朵字典列表
@@ -168,21 +203,21 @@ class Game:
             surf = pygame.Surface((w, h), pygame.SRCALPHA)
             pygame.draw.ellipse(
                 surf,
-                (*CLOUD_COLOR, CLOUD_ALPHA_INNER),
+                (*cloud_color, alpha_inner),
                 (0, h // 4, w, h // 2),
             )
             pygame.draw.ellipse(
                 surf,
-                (*CLOUD_COLOR, CLOUD_ALPHA_OUTER),
+                (*cloud_color, alpha_outer),
                 (w // 4, 0, w // 2, h),
             )
             clouds.append(
                 {
-                    "x": rng.randint(-200, 3200),
+                    "x": rng.uniform(0, SCREEN_WIDTH),
                     "y": rng.randint(20, 180),
                     "w": w,
                     "h": h,
-                    "speed": rng.uniform(0.1, 0.4),
+                    "speed": rng.uniform(0.05, 0.2),
                     "surface": surf,
                 }
             )
@@ -192,6 +227,8 @@ class Game:
         """
         构建背景山脉数据。
 
+        山脉固定在屏幕空间，不随相机移动。
+
         Returns:
             山脉字典列表，每座山包含 x, w, h 信息
         """
@@ -200,7 +237,7 @@ class Game:
         for _ in range(MOUNTAIN_COUNT):
             mountains.append(
                 {
-                    "x": rng.randint(-100, 3200),
+                    "x": rng.randint(-50, SCREEN_WIDTH + 50),
                     "h": rng.randint(80, 200),
                     "w": rng.randint(150, 300),
                 }
@@ -243,14 +280,6 @@ class Game:
         """
         加载指定关卡，重置所有游戏数据。
 
-        处理流程:
-        1. 获取关卡配置
-        2. 构建平台、金币、梯子、传送门
-        3. 重建玩家对象（重置出生点）
-        4. 重建天空渐变背景（根据关卡主题色）
-        5. 重置相机、粒子、得分类数据
-        6. 如果非立即加载，进入淡入阶段
-
         Args:
             level_id: 目标关卡编号
             spawn_x, spawn_y: 玩家出生坐标
@@ -267,7 +296,14 @@ class Game:
         self._sky_surface = self._build_sky_surface(
             self.level_config.sky_top, self.level_config.sky_bottom
         )
-        self.clouds = self._build_clouds()
+        self._stars_surface = self._build_stars_surface(
+            self.level_config.star_count, self.level_config.star_seed
+        ) if self.level_config.has_stars else None
+        self.clouds = self._build_clouds(
+            self.level_config.cloud_color,
+            self.level_config.cloud_alpha_inner,
+            self.level_config.cloud_alpha_outer,
+        )
         self.bg_mountains = self._build_mountains()
 
         self.camera_x = 0
@@ -285,11 +321,6 @@ class Game:
     def _start_transition(self, target_level, target_x, target_y):
         """
         启动关卡切换过渡流程。
-
-        阶段:
-        - phase 0: 淡出当前画面
-        - phase 1: 加载新关卡数据 + 显示加载界面
-        - phase 2: 淡入新画面
 
         Args:
             target_level: 目标关卡编号（-1 表示同关卡内传送）
@@ -316,12 +347,7 @@ class Game:
         )
 
     def _update_transition(self):
-        """
-        更新过渡动画状态机。
-
-        每阶段持续 TRANSITION_DURATION_FRAMES 帧，
-        阶段 1（加载）时同步更新加载进度条动画。
-        """
+        """更新过渡动画状态机。"""
         self.transition_frame += 1
         half_duration = TRANSITION_DURATION_FRAMES // 2
 
@@ -348,23 +374,7 @@ class Game:
         self, x, y, count, colors=PARTICLE_COLORS,
         spread=3, life=20, size=3
     ):
-        """
-        在指定位置生成一批粒子。
-
-        粒子参数均为随机区间：
-        - vx: [-spread, spread]
-        - vy: [-spread*1.5, -0.5]（向上偏）
-        - life: [life//2, life]
-        - size: [1, size]
-
-        Args:
-            x, y: 发射中心坐标
-            count: 生成数量
-            colors: 可选颜色列表
-            spread: 速度散布范围
-            life: 最大生命周期帧数
-            size: 最大粒子半径
-        """
+        """在指定位置生成一批粒子。"""
         for _ in range(count):
             vx = random.uniform(-spread, spread)
             vy = random.uniform(-spread * 1.5, -0.5)
@@ -374,13 +384,7 @@ class Game:
             self.particles.append(Particle(x, y, vx, vy, color, l, s))
 
     def _update_camera(self):
-        """
-        更新相机位置。
-
-        使用线性插值（LERP）实现平滑跟随，
-        目标位置为玩家左侧 1/3 屏幕处。
-        相机被限制在 [0, LEVEL_WIDTH - SCREEN_WIDTH] 范围内。
-        """
+        """更新相机位置，使用 LERP 平滑跟随。"""
         target_x = self.player.x - SCREEN_WIDTH / CAMERA_TARGET_RATIO
         self.camera_x += (target_x - self.camera_x) * CAMERA_LERP
         self.camera_x = max(0, min(self.camera_x, LEVEL_WIDTH - SCREEN_WIDTH))
@@ -389,19 +393,81 @@ class Game:
         """绘制预渲染的天空渐变背景。"""
         self.screen.blit(self._sky_surface, (0, 0))
 
+    def _draw_stars(self):
+        """绘制预渲染的星空背景，附带闪烁动画。"""
+        if self._stars_surface is None:
+            return
+
+        twinkle = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+        twinkle.blit(self._stars_surface, (0, 0))
+
+        rng = random.Random(self.tick // 6)
+        for _ in range(8):
+            sx = rng.randint(0, SCREEN_WIDTH)
+            sy = rng.randint(0, int(SCREEN_HEIGHT * 0.65))
+            pygame.draw.circle(twinkle, (255, 255, 255, 200), (sx, sy), 2)
+
+        self.screen.blit(twinkle, (0, 0))
+
+    def _draw_sun(self):
+        """绘制太阳，含光晕和射线效果。"""
+        if not self.level_config or not self.level_config.has_sun:
+            return
+
+        cfg = self.level_config
+        sx = int(SCREEN_WIDTH * cfg.sun_pos[0])
+        sy = int(SCREEN_HEIGHT * cfg.sun_pos[1])
+        color = cfg.sun_color
+
+        for r in range(60, 30, -8):
+            alpha = max(10, 40 - (60 - r) * 2)
+            glow = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (*color, alpha), (r, r), r)
+            self.screen.blit(glow, (sx - r, sy - r))
+
+        for i in range(12):
+            angle = math.radians(i * 30 + self.tick * 0.3)
+            length = 45 + math.sin(self.tick * 0.05 + i) * 10
+            ex = sx + int(math.cos(angle) * length)
+            ey = sy + int(math.sin(angle) * length)
+            pygame.draw.line(self.screen, color, (sx, sy), (ex, ey), 2)
+
+        pygame.draw.circle(self.screen, color, (sx, sy), 25)
+        lighter = tuple(min(255, c + 60) for c in color)
+        pygame.draw.circle(self.screen, lighter, (sx - 5, sy - 5), 12)
+
+    def _draw_moon(self):
+        """绘制月亮，含光晕和月牙效果。"""
+        if not self.level_config or not self.level_config.has_moon:
+            return
+
+        cfg = self.level_config
+        mx = int(SCREEN_WIDTH * cfg.moon_pos[0])
+        my = int(SCREEN_HEIGHT * cfg.moon_pos[1])
+        color = cfg.moon_color
+
+        for r in range(50, 25, -6):
+            alpha = max(8, 30 - (50 - r) * 2)
+            glow = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (*color, alpha), (r, r), r)
+            self.screen.blit(glow, (mx - r, my - r))
+
+        pygame.draw.circle(self.screen, color, (mx, my), 22)
+
+        shadow_color = self.level_config.sky_top
+        pygame.draw.circle(self.screen, shadow_color, (mx + 8, my - 4), 18)
+
     def _draw_mountains(self):
         """
-        绘制远景山脉，应用 0.3 视差因子。
+        绘制远景山脉，固定在屏幕空间不随相机移动。
 
-        每座山绘制：
-        - 山身三角形（使用关卡主题色）
-        - 山顶积雪小三角（使用关卡主题色）
+        每座山绘制山身三角形和山顶积雪小三角。
         """
         base_y = SCREEN_HEIGHT - 40
         mountain_color = self.level_config.mountain_color if self.level_config else MOUNTAIN_COLOR
         snow_color = self.level_config.mountain_snow_color if self.level_config else MOUNTAIN_SNOW_COLOR
         for m in self.bg_mountains:
-            mx = m["x"] - self.camera_x * 0.3
+            mx = m["x"]
             w = m["w"]
             h = m["h"]
             half_w = w / 2
@@ -425,27 +491,18 @@ class Game:
 
     def _draw_clouds(self):
         """
-        绘制云朵，应用 0.5 视差因子并水平循环飘移。
-
-        使用预渲染 Surface 直接 blit，避免每帧重建图形。
+        绘制云朵，固定在屏幕空间缓慢飘移，不随相机移动。
         """
         for c in self.clouds:
             c["x"] += c["speed"]
-            if c["x"] > 3200:
-                c["x"] = -200
-            cx = c["x"] - self.camera_x * 0.5
+            if c["x"] > SCREEN_WIDTH + c["w"]:
+                c["x"] = -c["w"]
+            cx = c["x"]
             if -c["w"] < cx < SCREEN_WIDTH + c["w"]:
                 self.screen.blit(c["surface"], (int(cx), int(c["y"])))
 
     def _check_coins(self):
-        """
-        检测玩家与金币的碰撞。
-
-        当玩家矩形与未收集金币重叠时：
-        - 标记为已收集并启动收集动画
-        - 增加 10 分
-        - 生成金币粒子特效
-        """
+        """检测玩家与金币的碰撞。"""
         player_rect = self.player.get_rect()
         for coin in self.coins:
             if not coin.collected and player_rect.colliderect(coin.get_rect()):
@@ -463,14 +520,7 @@ class Game:
                 )
 
     def _check_portals(self):
-        """
-        检测玩家与传送门的交互。
-
-        当玩家进入已激活传送门范围时：
-        - 触发传送门冷却
-        - 启动关卡/区域切换过渡流程
-        - 生成传送粒子特效
-        """
+        """检测玩家与传送门的交互。"""
         player_rect = self.player.get_rect()
         for portal in self.portals:
             if portal.can_trigger(player_rect, self.score):
@@ -493,13 +543,7 @@ class Game:
                 break
 
     def _draw_hud(self):
-        """
-        绘制抬头显示（HUD）。
-
-        左上角：金币得分（带阴影效果）
-        中上：当前关卡名称
-        右上角：操作提示
-        """
+        """绘制抬头显示（HUD）。"""
         coin_text = self.font.render(f"Coins: {self.score}", True, WHITE)
         shadow_text = self.font.render(f"Coins: {self.score}", True, BLACK)
         self.screen.blit(shadow_text, (22, 17))
@@ -541,15 +585,7 @@ class Game:
         self.screen.blit(overlay, (0, 0))
 
     def _draw_loading_screen(self):
-        """
-        绘制加载界面。
-
-        包含:
-        - 关卡名称标题
-        - 关卡描述文本
-        - 加载进度条
-        - 进度百分比文本
-        """
+        """绘制加载界面，含关卡名称、描述和进度条。"""
         overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
         overlay.fill(TRANSITION_COLOR)
         self.screen.blit(overlay, (0, 0))
@@ -591,15 +627,7 @@ class Game:
         self.screen.blit(pct_text, (pct_x, bar_y + LOADING_BAR_HEIGHT + 15))
 
     def _build_healthcheck_keys(self):
-        """
-        构建健康检查模式下的模拟按键对象。
-
-        模拟自动向右移动并周期性跳跃，以便无窗口环境下
-        自动验证游戏逻辑运行正常。
-
-        Returns:
-            支持下标访问的模拟按键字典对象
-        """
+        """构建健康检查模式下的模拟按键对象。"""
         sim_keys = {
             pygame.K_RIGHT: True,
             pygame.K_SPACE: self.tick % 120 < 10,
@@ -619,12 +647,7 @@ class Game:
         return _KeyProxy()
 
     def _handle_events(self):
-        """
-        处理 pygame 事件队列。
-
-        Returns:
-            bool: True 表示游戏应继续运行，False 表示请求退出
-        """
+        """处理 pygame 事件队列。"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
@@ -634,23 +657,7 @@ class Game:
         return True
 
     def _update_world(self, keys):
-        """
-        更新游戏世界状态（逻辑帧）。
-
-        处理流程:
-        1. 更新玩家，记录落地状态变化
-        2. 刚落地时生成落地尘土
-        3. 地面高速移动时生成跑步尘土
-        4. 检测金币收集
-        5. 更新金币动画
-        6. 检测传送门触发
-        7. 更新传送门状态
-        8. 更新粒子池（过滤死亡粒子 + 位置更新）
-        9. 更新相机位置
-
-        Args:
-            keys: 按键状态（真实或模拟）
-        """
+        """更新游戏世界状态（逻辑帧）。"""
         old_on_ground = self.player.on_ground
         self.player.update(keys, self.platforms, self.ladders)
 
@@ -707,27 +714,32 @@ class Game:
         渲染整个场景（渲染帧）。
 
         绘制顺序（从远到近）:
-        1. 天空渐变（最底层）
-        2. 远景山脉（0.3 视差）
-        3. 云朵（0.5 视差）
-        4. 所有平台
-        5. 所有梯子
-        6. 所有金币
-        7. 所有传送门
-        8. 粒子特效
-        9. 玩家
-        10. HUD（最顶层，屏幕空间）
+        1. 天空渐变（最底层，屏幕固定）
+        2. 星空（屏幕固定，仅夜光关卡）
+        3. 太阳/月亮（屏幕固定）
+        4. 远景山脉（屏幕固定）
+        5. 云朵（屏幕固定缓慢飘移）
+        6. 所有平台（随相机滚动）
+        7. 所有梯子（随相机滚动）
+        8. 所有金币（随相机滚动）
+        9. 所有传送门（随相机滚动）
+        10. 粒子特效（随相机滚动）
+        11. 玩家（随相机滚动）
+        12. HUD（最顶层，屏幕空间）
 
         特殊状态:
         - LOADING: 绘制加载界面覆盖层
         - TRANSITIONING: 绘制过渡遮罩
         """
         self._draw_sky()
+        self._draw_stars()
+        self._draw_sun()
+        self._draw_moon()
         self._draw_mountains()
         self._draw_clouds()
 
         for plat in self.platforms:
-            plat.draw(self.screen, self.camera_x)
+            plat.draw(self.screen, self.camera_x, self.level_config)
 
         for ladder in self.ladders:
             ladder.draw(self.screen, self.camera_x)
@@ -751,21 +763,7 @@ class Game:
             self._draw_transition()
 
     def run(self):
-        """
-        游戏主循环入口。
-
-        每帧执行顺序:
-        1. 帧计数器自增
-        2. 健康检查模式下检查是否达到最大帧数
-        3. 处理事件（退出条件）
-        4. 获取真实按键或构建模拟按键
-        5. 根据游戏状态更新（PLAYING: 更新世界 / TRANSITIONING: 更新过渡）
-        6. 渲染画面
-        7. 交换缓冲 + 帧率控制
-
-        非 HEADLESS 模式下才执行 display.flip，
-        两种模式都执行 clock.tick 以保持时间一致性。
-        """
+        """游戏主循环入口。"""
         running = True
         while running:
             self.tick += 1

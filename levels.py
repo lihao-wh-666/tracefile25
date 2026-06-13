@@ -8,10 +8,10 @@ levels.py - 多关卡数据定义模块
 - 梯子位置
 - 传送门配置（同关卡区域传送 / 跨关卡传送）
 - 玩家出生点
-- 背景风格配置（天空颜色、山脉颜色等）
+- 背景风格配置（天空颜色、山脉颜色、云朵颜色、装饰元素等）
 """
 
-from config import SCREEN_HEIGHT, PLAYER_SPAWN_X, PLAYER_SPAWN_Y
+from config import SCREEN_HEIGHT, SCREEN_WIDTH, PLAYER_SPAWN_X, PLAYER_SPAWN_Y
 
 
 class LevelConfig:
@@ -34,6 +34,22 @@ class LevelConfig:
         sky_bottom: 天空底部渐变颜色
         mountain_color: 山脉主体颜色
         mountain_snow_color: 山脉积雪颜色
+        cloud_color: 云朵颜色
+        cloud_alpha_inner: 云朵内部透明度
+        cloud_alpha_outer: 云朵外部透明度
+        has_stars: 是否绘制星空
+        star_count: 星星数量
+        star_seed: 星星随机种子
+        has_sun: 是否绘制太阳
+        sun_color: 太阳颜色
+        sun_pos: 太阳屏幕位置 (x_ratio, y_ratio)
+        has_moon: 是否绘制月亮
+        moon_color: 月亮颜色
+        moon_pos: 月亮屏幕位置 (x_ratio, y_ratio)
+        ground_color: 地面颜色
+        dirt_color: 泥土颜色
+        platform_color: 平台颜色
+        platform_top_color: 平台顶部颜色
     """
 
     def __init__(
@@ -52,6 +68,22 @@ class LevelConfig:
         sky_bottom=(200, 230, 255),
         mountain_color=(70, 120, 80),
         mountain_snow_color=(230, 240, 250),
+        cloud_color=(255, 255, 255),
+        cloud_alpha_inner=160,
+        cloud_alpha_outer=180,
+        has_stars=False,
+        star_count=0,
+        star_seed=0,
+        has_sun=False,
+        sun_color=(255, 220, 100),
+        sun_pos=(0.85, 0.15),
+        has_moon=False,
+        moon_color=(240, 240, 220),
+        moon_pos=(0.85, 0.12),
+        ground_color=(80, 160, 60),
+        dirt_color=(120, 80, 40),
+        platform_color=(90, 70, 50),
+        platform_top_color=(70, 150, 50),
     ):
         self.level_id = level_id
         self.name = name
@@ -67,6 +99,22 @@ class LevelConfig:
         self.sky_bottom = sky_bottom
         self.mountain_color = mountain_color
         self.mountain_snow_color = mountain_snow_color
+        self.cloud_color = cloud_color
+        self.cloud_alpha_inner = cloud_alpha_inner
+        self.cloud_alpha_outer = cloud_alpha_outer
+        self.has_stars = has_stars
+        self.star_count = star_count
+        self.star_seed = star_seed
+        self.has_sun = has_sun
+        self.sun_color = sun_color
+        self.sun_pos = sun_pos
+        self.has_moon = has_moon
+        self.moon_color = moon_color
+        self.moon_pos = moon_pos
+        self.ground_color = ground_color
+        self.dirt_color = dirt_color
+        self.platform_color = platform_color
+        self.platform_top_color = platform_top_color
 
 
 def build_level_0():
@@ -75,7 +123,8 @@ def build_level_0():
 
     设计特点:
     - 经典草地平台跳跃入门关卡
-    - 包含 2 个同关卡区域传送门
+    - 传送门 1：传送至高空浮台区域 (x≈2040, 高空)
+    - 传送门 2：传送至中段浮台区域 (x≈1390, 中层)
     - 关卡末尾传送门进入第 2 关
     """
     ground_specs = [
@@ -122,8 +171,8 @@ def build_level_0():
         (2650, 180, 420),
     ]
     portal_specs = [
-        (950, SCREEN_HEIGHT - 40 - 90, -1, 1820, SCREEN_HEIGHT - 40 - 38, 0),
-        (2200, SCREEN_HEIGHT - 40 - 90, -1, 560, SCREEN_HEIGHT - 40 - 38, 0),
+        (950, SCREEN_HEIGHT - 40 - 90, -1, 2040, 162, 0),
+        (2200, SCREEN_HEIGHT - 40 - 90, -1, 1390, 262, 0),
         (2900, 130, 1, 100, 400, 0),
     ]
     return LevelConfig(
@@ -141,6 +190,16 @@ def build_level_0():
         sky_bottom=(200, 230, 255),
         mountain_color=(70, 120, 80),
         mountain_snow_color=(230, 240, 250),
+        cloud_color=(255, 255, 255),
+        cloud_alpha_inner=160,
+        cloud_alpha_outer=180,
+        has_sun=True,
+        sun_color=(255, 230, 100),
+        sun_pos=(0.85, 0.12),
+        ground_color=(80, 160, 60),
+        dirt_color=(120, 80, 40),
+        platform_color=(90, 70, 50),
+        platform_top_color=(70, 150, 50),
     )
 
 
@@ -151,8 +210,8 @@ def build_level_1():
     设计特点:
     - 暖色调沙漠风格
     - 更复杂的平台布局
+    - 传送门 1：传送至高空浮台区域 (x≈1640, 高空)
     - 需要收集 5 枚金币激活终点传送门
-    - 包含同关卡快速传送
     """
     ground_specs = [
         (0, SCREEN_HEIGHT - 40, 350, 40),
@@ -199,7 +258,7 @@ def build_level_1():
         (2500, 200, 400),
     ]
     portal_specs = [
-        (850, SCREEN_HEIGHT - 40 - 90, -1, 1880, SCREEN_HEIGHT - 40 - 38, 0),
+        (850, SCREEN_HEIGHT - 40 - 90, -1, 1640, 142, 0),
         (2900, 130, 2, 100, 400, 5),
     ]
     return LevelConfig(
@@ -213,10 +272,20 @@ def build_level_1():
         coin_positions=coin_positions,
         ladder_specs=ladder_specs,
         portal_specs=portal_specs,
-        sky_top=(255, 150, 80),
-        sky_bottom=(255, 210, 160),
-        mountain_color=(180, 100, 60),
-        mountain_snow_color=(255, 220, 180),
+        sky_top=(255, 140, 60),
+        sky_bottom=(255, 200, 140),
+        mountain_color=(200, 130, 70),
+        mountain_snow_color=(255, 220, 170),
+        cloud_color=(255, 200, 150),
+        cloud_alpha_inner=120,
+        cloud_alpha_outer=150,
+        has_sun=True,
+        sun_color=(255, 180, 50),
+        sun_pos=(0.5, 0.18),
+        ground_color=(210, 170, 90),
+        dirt_color=(180, 140, 70),
+        platform_color=(160, 110, 60),
+        platform_top_color=(210, 170, 90),
     )
 
 
@@ -227,8 +296,9 @@ def build_level_2():
     设计特点:
     - 夜晚星空风格，冷色调
     - 最高难度的平台布局
+    - 传送门 1：传送至极高浮台 (x≈1940, 极高空)
+    - 传送门 2：传送至中段浮台 (x≈1140, 中层)
     - 需要收集 10 枚金币激活最终传送门
-    - 包含多个同关卡传送捷径
     """
     ground_specs = [
         (0, SCREEN_HEIGHT - 40, 300, 40),
@@ -279,8 +349,8 @@ def build_level_2():
         (2600, 240, 360),
     ]
     portal_specs = [
-        (750, SCREEN_HEIGHT - 40 - 90, -1, 1600, SCREEN_HEIGHT - 40 - 38, 0),
-        (1920, SCREEN_HEIGHT - 40 - 90, -1, 420, SCREEN_HEIGHT - 40 - 38, 0),
+        (750, SCREEN_HEIGHT - 40 - 90, -1, 1940, 92, 0),
+        (1920, SCREEN_HEIGHT - 40 - 90, -1, 1140, 262, 0),
         (2900, 0, 0, 100, 400, 10),
     ]
     return LevelConfig(
@@ -294,10 +364,23 @@ def build_level_2():
         coin_positions=coin_positions,
         ladder_specs=ladder_specs,
         portal_specs=portal_specs,
-        sky_top=(20, 20, 80),
-        sky_bottom=(60, 40, 120),
-        mountain_color=(40, 30, 80),
-        mountain_snow_color=(200, 200, 255),
+        sky_top=(10, 10, 40),
+        sky_bottom=(30, 20, 80),
+        mountain_color=(30, 20, 60),
+        mountain_snow_color=(180, 180, 230),
+        cloud_color=(80, 70, 120),
+        cloud_alpha_inner=80,
+        cloud_alpha_outer=100,
+        has_stars=True,
+        star_count=80,
+        star_seed=789,
+        has_moon=True,
+        moon_color=(240, 240, 210),
+        moon_pos=(0.82, 0.1),
+        ground_color=(40, 35, 60),
+        dirt_color=(30, 25, 50),
+        platform_color=(60, 50, 90),
+        platform_top_color=(80, 70, 120),
     )
 
 

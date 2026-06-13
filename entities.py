@@ -181,16 +181,19 @@ class Platform:
                 gx = rng.randint(4, width - 4)
                 self.grass_tufts.append(gx)
 
-    def draw(self, surface, camera_x):
+    def draw(self, surface, camera_x, level_config=None):
         """
         绘制平台。
-        
+
         地面平台：草地顶层 + 泥土下层 + 随机草束
         浮动平台：木板主体 + 草地顶层 + 亮边 + 预设草束
-        
+
+        支持通过 level_config 传入关卡配色覆盖默认颜色。
+
         Args:
             surface: 目标绘制 Surface
             camera_x: 相机水平偏移量
+            level_config: 关卡配置对象（可选，提供关卡配色）
         """
         draw_rect = pygame.Rect(
             self.rect.x - camera_x,
@@ -202,15 +205,26 @@ class Platform:
         if draw_rect.right < 0 or draw_rect.left > SCREEN_WIDTH:
             return
 
+        if level_config:
+            ground_col = level_config.ground_color
+            dirt_col = level_config.dirt_color
+            plat_col = level_config.platform_color
+            plat_top_col = level_config.platform_top_color
+        else:
+            ground_col = GROUND_COLOR
+            dirt_col = DIRT_COLOR
+            plat_col = PLATFORM_COLOR
+            plat_top_col = PLATFORM_TOP_COLOR
+
         if self.is_ground:
-            pygame.draw.rect(surface, GROUND_COLOR, draw_rect)
+            pygame.draw.rect(surface, ground_col, draw_rect)
             dirt_rect = pygame.Rect(
                 draw_rect.x,
                 draw_rect.y + 6,
                 draw_rect.width,
                 draw_rect.height - 6,
             )
-            pygame.draw.rect(surface, DIRT_COLOR, dirt_rect)
+            pygame.draw.rect(surface, dirt_col, dirt_rect)
 
             rng = random.Random(PLATFORM_GRASS_SEED)
             for _ in range(draw_rect.width // 8):
@@ -231,10 +245,10 @@ class Platform:
                     2,
                 )
         else:
-            pygame.draw.rect(surface, PLATFORM_COLOR, draw_rect)
+            pygame.draw.rect(surface, plat_col, draw_rect)
 
             top_rect = pygame.Rect(draw_rect.x, draw_rect.y, draw_rect.width, 6)
-            pygame.draw.rect(surface, PLATFORM_TOP_COLOR, top_rect)
+            pygame.draw.rect(surface, plat_top_col, top_rect)
 
             highlight_rect = pygame.Rect(
                 draw_rect.x, draw_rect.y + 6, draw_rect.width, 2
