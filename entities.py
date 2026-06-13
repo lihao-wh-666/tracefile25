@@ -334,6 +334,7 @@ class Player:
     - 短跳：松开跳跃键时减速（可控制跳跃高度）
     - 视觉：挤压拉伸、跑步动画、攀爬动画、随机眨眼
     - 碰撞：水平/垂直分离解析，防止穿墙
+    - 音频回调：跳跃、落地、多段跳、死亡事件触发
     """
 
     def __init__(self, x, y):
@@ -369,6 +370,11 @@ class Player:
         self.eye_blink = 0
         self.blink_timer = 0
         self.died = False
+
+        self.on_jump = None
+        self.on_double_jump = None
+        self.on_land = None
+        self.on_death = None
 
     def get_rect(self):
         """返回玩家碰撞矩形。"""
@@ -425,6 +431,8 @@ class Player:
 
         if self.y > FALL_RESPAWN_Y:
             self.died = True
+            if self.on_death:
+                self.on_death()
             self.x = self.start_x
             self.y = 0
             self.vx = 0
@@ -487,6 +495,8 @@ class Player:
             self.on_ground = False
             self.jump_pressed = True
             self.target_squash = SQUASH_ON_JUMP
+            if self.on_jump:
+                self.on_jump()
             return
 
         self.vy = 0
@@ -586,6 +596,8 @@ class Player:
             self.jump_buffer = 0
             self.jump_count = 1
             self.target_squash = SQUASH_ON_JUMP
+            if self.on_jump:
+                self.on_jump()
         elif self.jump_buffer > 0 and not self.on_ground and self.jump_count > 0:
             if (self.jump_count < MAX_JUMP_COUNT
                     and self.multi_jump_cooldown <= 0):
@@ -594,6 +606,8 @@ class Player:
                 self.jump_count += 1
                 self.multi_jump_cooldown = MULTI_JUMP_INTERVAL_FRAMES
                 self.target_squash = SQUASH_ON_JUMP
+                if self.on_double_jump:
+                    self.on_double_jump()
 
         if not want_jump and self.vy < SHORT_JUMP_THRESHOLD:
             self.vy *= SHORT_JUMP_MULTIPLIER
@@ -658,6 +672,8 @@ class Player:
                     self.vy = 0
                     if not was_on_ground and not self.on_ground:
                         self.target_squash = SQUASH_ON_LAND
+                        if self.on_land:
+                            self.on_land()
                     self.on_ground = True
                 elif self.vy < 0:
                     self.y = plat.rect.bottom

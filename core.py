@@ -42,10 +42,13 @@ from config import (
     GROUND_COLOR, DIRT_COLOR, PLATFORM_COLOR, PLATFORM_TOP_COLOR,
     PLATFORM_HIGHLIGHT, GRASS_DARK, GRASS_LIGHT,
     GRASS_TUFT_DARK, GRASS_TUFT_LIGHT, PLATFORM_GRASS_SEED,
+    SHOW_VOLUME_PANEL_KEY,
 )
 
 from entities import Particle, Coin, Platform, Player, Ladder, Portal
 from levels import get_level_config, LEVEL_BUILDERS
+from audio import AudioManager
+from ui import VolumePanel
 
 
 class GameState:
@@ -120,7 +123,30 @@ class Game:
         self.clouds = []
         self.bg_mountains = []
 
+        self.audio = AudioManager()
+        self.volume_panel = VolumePanel(self.audio)
+        self.volume_panel.on_bgm_change = self._on_bgm_volume_change
+        self.volume_panel.on_sfx_change = self._on_sfx_volume_change
+        self._bind_player_audio_callbacks()
+
         self._load_level(0, PLAYER_SPAWN_X, PLAYER_SPAWN_Y, immediate=True)
+
+    def _bind_player_audio_callbacks(self):
+        """为玩家对象绑定音频事件回调。"""
+        self.player.on_jump = lambda: self.audio.play_sfx(AudioManager.SFX_JUMP)
+        self.player.on_double_jump = lambda: self.audio.play_sfx(
+            AudioManager.SFX_DOUBLE_JUMP
+        )
+        self.player.on_land = lambda: self.audio.play_sfx(AudioManager.SFX_LAND)
+        self.player.on_death = lambda: self.audio.play_sfx(AudioManager.SFX_DEATH)
+
+    def _on_bgm_volume_change(self, volume):
+        """背景音乐音量滑块变化回调。"""
+        self.audio.set_bgm_volume(volume)
+
+    def _on_sfx_volume_change(self, volume):
+        """音效音量滑块变化回调。"""
+        self.audio.set_sfx_volume(volume)
 
     def _build_sky_surface(self, sky_top, sky_bottom):
         """
@@ -292,6 +318,9 @@ class Game:
         self.player = Player(spawn_x, spawn_y)
         self.player.start_x = spawn_x
         self.player.start_y = spawn_y
+        self._bind_player_audio_callbacks()
+
+        self.audio.play_bgm(f"level_{level_id % 3}")
 
         self._sky_surface = self._build_sky_surface(
             self.level_config.sky_top, self.level_config.sky_bottom
@@ -509,6 +538,7 @@ class Game:
                 coin.collected = True
                 coin.collect_anim = 15
                 self.score += COIN_COLLECT_SCORE
+                self.audio.play_sfx(AudioManager.SFX_COIN)
                 self._spawn_particles(
                     coin.x,
                     coin.y,
@@ -525,6 +555,7 @@ class Game:
         for portal in self.portals:
             if portal.can_trigger(player_rect, self.score):
                 portal.trigger()
+                self.audio.play_sfx(AudioManager.SFX_PORTAL)
                 self._start_transition(
                     portal.target_level,
                     portal.target_x,
@@ -568,6 +599,12 @@ class Game:
             True, (50, 50, 80),
         )
         self.screen.blit(hint, (SCREEN_WIDTH - hint.get_width() - 15, 15))
+
+        audio_hint = self.font.render(
+            "[V] Audio Settings",
+            True, (80, 80, 120) if not self.volume_panel.visible else (100, 200, 255),
+        )
+        self.screen.blit(audio_hint, (SCREEN_WIDTH - audio_hint.get_width() - 15, 40))
 
     def _draw_transition(self):
         """绘制过渡动画遮罩层（淡出/淡入）。"""
@@ -654,6 +691,9 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     return False
+                if event.key == SHOW_VOLUME_PANEL_KEY:
+                    self.volume_panel.toggle()
+            self.volume_panel.handle_event(event)
         return True
 
     def _update_world(self, keys):
@@ -762,6 +802,8 @@ class Game:
         elif self.game_state == GameState.TRANSITIONING:
             self._draw_transition()
 
+        self.volume_panel.draw(self.screen, self.big_font, self.font)
+
     def run(self):
         """游戏主循环入口。"""
         running = True
@@ -794,5 +836,6 @@ class Game:
             else:
                 self.clock.tick(FPS)
 
+        self.audio.shutdown()
         pygame.quit()
         sys.exit()
