@@ -171,8 +171,8 @@ def build_level_0():
         (2650, 180, 420),
     ]
     portal_specs = [
-        (950, SCREEN_HEIGHT - 40 - 90, -1, 2040, 162, 0),
-        (2200, SCREEN_HEIGHT - 40 - 90, -1, 1390, 262, 0),
+        (950, SCREEN_HEIGHT - 40 - 90, -1, 1600, 210, 0),
+        (2200, SCREEN_HEIGHT - 40 - 90, -1, 2600, 130, 0),
         (2900, 130, 1, 100, 400, 0),
     ]
     return LevelConfig(
@@ -349,8 +349,8 @@ def build_level_2():
         (2600, 240, 360),
     ]
     portal_specs = [
-        (750, SCREEN_HEIGHT - 40 - 90, -1, 1940, 92, 0),
-        (1920, SCREEN_HEIGHT - 40 - 90, -1, 1140, 262, 0),
+        (750, SCREEN_HEIGHT - 40 - 90, -1, 1500, 120, 0),
+        (1920, SCREEN_HEIGHT - 40 - 90, -1, 2400, 80, 0),
         (2900, 0, 0, 100, 400, 10),
     ]
     return LevelConfig(
