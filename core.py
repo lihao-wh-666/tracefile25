@@ -49,13 +49,7 @@ from entities import Particle, Coin, Platform, Player, Ladder, Portal
 from levels import get_level_config, LEVEL_BUILDERS
 from audio import AudioManager
 from ui import VolumePanel
-
-
-class GameState:
-    """游戏状态枚举类。"""
-    PLAYING = "playing"
-    TRANSITIONING = "transitioning"
-    LOADING = "loading"
+from menus import GameState, MenuManager
 
 
 class Game:
@@ -128,6 +122,9 @@ class Game:
         self.volume_panel.on_bgm_change = self._on_bgm_volume_change
         self.volume_panel.on_sfx_change = self._on_sfx_volume_change
         self._bind_player_audio_callbacks()
+
+        self.menu_manager = MenuManager(self)
+        self.game_state = GameState.MAIN_MENU
 
         self._load_level(0, PLAYER_SPAWN_X, PLAYER_SPAWN_Y, immediate=True)
 
@@ -688,12 +685,24 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
+
+            if self.menu_manager.is_menu_active():
+                if self.menu_manager.handle_event(event):
+                    continue
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    return False
-                if event.key == SHOW_VOLUME_PANEL_KEY:
+                    if self.game_state == GameState.PLAYING:
+                        self.menu_manager.set_state(GameState.PAUSED)
+                    elif self.game_state == GameState.PAUSED:
+                        self.menu_manager.set_state(GameState.PLAYING)
+                    else:
+                        return False
+                if event.key == SHOW_VOLUME_PANEL_KEY and self.game_state == GameState.PLAYING:
                     self.volume_panel.toggle()
-            self.volume_panel.handle_event(event)
+
+            if self.game_state == GameState.PLAYING:
+                self.volume_panel.handle_event(event)
         return True
 
     def _update_world(self, keys):
@@ -702,11 +711,13 @@ class Game:
         self.player.update(keys, self.platforms, self.ladders)
 
         if self.player.died:
+            final_score = self.score
             self.score = 0
             for coin in self.coins:
                 coin.collected = False
                 coin.collect_anim = 0
             self.player.died = False
+            self.menu_manager.trigger_game_over(final_score)
 
         if self.player.on_ground and not old_on_ground and self.player.vy == 0:
             self._spawn_particles(
@@ -770,6 +781,7 @@ class Game:
         特殊状态:
         - LOADING: 绘制加载界面覆盖层
         - TRANSITIONING: 绘制过渡遮罩
+        - 菜单状态: 绘制菜单覆盖层
         """
         self._draw_sky()
         self._draw_stars()
@@ -802,7 +814,11 @@ class Game:
         elif self.game_state == GameState.TRANSITIONING:
             self._draw_transition()
 
-        self.volume_panel.draw(self.screen, self.big_font, self.font)
+        if self.game_state == GameState.PLAYING:
+            self.volume_panel.draw(self.screen, self.big_font, self.font)
+
+        if self.menu_manager.is_menu_active():
+            self.menu_manager.draw(self.screen, self.big_font, self.font, self.font)
 
     def run(self):
         """游戏主循环入口。"""
@@ -823,10 +839,18 @@ class Game:
             if HEADLESS and HEALTHCHECK:
                 keys = self._build_healthcheck_keys()
 
-            if self.game_state == GameState.PLAYING:
+            current_state = self.menu_manager.current_state
+
+            if current_state == GameState.PLAYING:
+                self.game_state = GameState.PLAYING
                 self._update_world(keys)
-            elif self.game_state in (GameState.TRANSITIONING, GameState.LOADING):
+            elif current_state == GameState.PAUSED:
+                self.game_state = GameState.PAUSED
+            elif current_state in (GameState.TRANSITIONING, GameState.LOADING):
                 self._update_transition()
+            else:
+                self.game_state = current_state
+                self.menu_manager.update()
 
             self._render()
 
