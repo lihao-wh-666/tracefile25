@@ -26,12 +26,20 @@ from config import (
 from audio import AudioManager
 
 
+_FONT_CACHE = {}
+
+
 def get_chinese_font(size):
     """
     获取支持中文显示的字体。
 
-    优先使用系统中的中文字体（微软雅黑、黑体、宋体等），
-    如果找不到则回退到 pygame 默认字体。
+    优先使用 TTF 格式字体（避免 TTC 集合字体在 pygame 中的渲染问题），
+    使用字体缓存避免重复加载同一字体。
+
+    支持平台：
+    - Windows: 黑体 simhei.ttf、微软雅黑 msyh.ttc、宋体 simsun.ttc
+    - macOS: PingFang 苹方
+    - Linux: 文泉驿微米黑、Noto Sans CJK
 
     Args:
         size: 字体大小
@@ -39,10 +47,14 @@ def get_chinese_font(size):
     Returns:
         pygame.font.Font: 支持中文的字体对象
     """
+    cache_key = size
+    if cache_key in _FONT_CACHE:
+        return _FONT_CACHE[cache_key]
+
     font_paths = [
+        "C:/Windows/Fonts/simhei.ttf",
         "C:/Windows/Fonts/msyh.ttc",
         "C:/Windows/Fonts/msyhbd.ttc",
-        "C:/Windows/Fonts/simhei.ttf",
         "C:/Windows/Fonts/simsun.ttc",
         "/System/Library/Fonts/PingFang.ttc",
         "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
@@ -50,14 +62,20 @@ def get_chinese_font(size):
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     ]
 
+    font = None
     for path in font_paths:
         if os.path.exists(path):
             try:
-                return pygame.font.Font(path, size)
+                font = pygame.font.Font(path, size)
+                break
             except (pygame.error, OSError):
                 continue
 
-    return pygame.font.Font(None, size)
+    if font is None:
+        font = pygame.font.Font(None, size)
+
+    _FONT_CACHE[cache_key] = font
+    return font
 
 
 MENU_BG_COLOR = (20, 20, 40)

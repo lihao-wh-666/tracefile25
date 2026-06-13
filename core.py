@@ -572,9 +572,11 @@ class Game:
 
     def _draw_hud(self):
         """绘制抬头显示（HUD）。"""
+        SHADOW_OFFSET = 3
+
         coin_text = self.font.render(f"金币: {self.score}", True, WHITE)
         shadow_text = self.font.render(f"金币: {self.score}", True, BLACK)
-        self.screen.blit(shadow_text, (22, 17))
+        self.screen.blit(shadow_text, (20 + SHADOW_OFFSET, 15 + SHADOW_OFFSET))
         self.screen.blit(coin_text, (20, 15))
 
         if self.level_config:
@@ -588,7 +590,7 @@ class Game:
                 True, BLACK,
             )
             text_x = (SCREEN_WIDTH - level_text.get_width()) // 2
-            self.screen.blit(level_shadow, (text_x + 2, 17))
+            self.screen.blit(level_shadow, (text_x + SHADOW_OFFSET, 15 + SHADOW_OFFSET))
             self.screen.blit(level_text, (text_x, 15))
 
         hint = self.font.render(

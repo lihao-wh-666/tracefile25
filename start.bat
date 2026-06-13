@@ -5,41 +5,32 @@ set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
 echo ========================================
-echo    Platform Jumper - Game Launcher
+echo    平台跳跃 - 游戏启动器
 echo ========================================
 echo.
 
 python -c "import pygame" >nul 2>&1
 if errorlevel 1 (
-    echo [WARN] pygame not detected, installing automatically...
+    echo [警告] 未检测到 pygame，正在自动安装...
     pip install pygame
     if errorlevel 1 (
-        echo [ERROR] Failed to install pygame. Please run: pip install pygame
+        echo [错误] pygame 安装失败，请手动执行: pip install pygame
         pause
         exit /b 1
     )
-    echo [INFO] pygame installed successfully.
+    echo [信息] pygame 安装成功。
     echo.
 )
 
-echo [INFO] Starting game...
+echo [信息] 正在启动游戏...
 echo.
 
-start "Platform Jumper" python "%SCRIPT_DIR%platform_jumper.py"
+python "%SCRIPT_DIR%platform_jumper.py"
 
-timeout /t 2 /nobreak >nul
-
-tasklist /fi "imagename eq python.exe" /fi "windowtitle eq Platform Jumper" | find "python.exe" >nul
 if errorlevel 1 (
-    echo [WARN] No separate window detected, launching in current process...
-    python "%SCRIPT_DIR%platform_jumper.py"
-) else (
-    echo [OK] Game started successfully!
     echo.
-    echo Controls:
-    echo   Left/Right Arrow or A/D  - Move
-    echo   Space / Up Arrow / W     - Jump (hold for higher jump)
-    echo   ESC                      - Quit
+    echo [错误] 游戏异常退出。
+    pause
 )
 
 endlocal
