@@ -351,6 +351,7 @@ class Player:
         self.run_anim = 0
         self.eye_blink = 0
         self.blink_timer = 0
+        self.died = False
 
     def get_rect(self):
         """返回玩家碰撞矩形。"""
@@ -406,6 +407,7 @@ class Player:
             self.vx = 0
 
         if self.y > FALL_RESPAWN_Y:
+            self.died = True
             self.x = self.start_x
             self.y = 0
             self.vx = 0
@@ -446,17 +448,6 @@ class Player:
                 break
 
     def _update_climbing(self, climb_up, climb_down, climb_left, climb_right, platforms, ladders):
-        """
-        更新攀爬状态。
-
-        逻辑:
-        - 按上/下键以固定速度上下移动
-        - 按左右方向键脱离梯子（水平方向移动）
-        - 到达梯子顶部自动脱离并站到顶部平台
-        - 到达梯子底部且在地面上自动脱离
-        - 按跳跃键脱离梯子并进入跳跃状态
-        - 攀爬动画帧更新
-        """
         want_jump = pygame.key.get_pressed()[pygame.K_SPACE]
 
         if climb_left or climb_right:
@@ -502,8 +493,14 @@ class Player:
                 self.on_ground = False
                 self.vy = 0
                 self._resolve_vertical(platforms, False)
+                return
 
-        self._resolve_vertical(platforms, self.on_ground)
+        if self.current_ladder is not None:
+            filtered = [p for p in platforms if not self.current_ladder.rect.colliderect(p.rect)]
+        else:
+            filtered = platforms
+
+        self._resolve_vertical(filtered, self.on_ground)
 
         player_rect = self.get_rect()
         still_on_ladder = False
@@ -514,6 +511,7 @@ class Player:
         if not still_on_ladder:
             self.climbing = False
             self.current_ladder = None
+            self._resolve_vertical(platforms, self.on_ground)
 
         if not climb_up and not climb_down:
             self.climb_anim += 0.02

@@ -425,6 +425,13 @@ class Game:
         old_on_ground = self.player.on_ground
         self.player.update(keys, self.platforms, self.ladders)
 
+        if self.player.died:
+            self.score = 0
+            for coin in self.coins:
+                coin.collected = False
+                coin.collect_anim = 0
+            self.player.died = False
+
         if self.player.on_ground and not old_on_ground and self.player.vy == 0:
             self._spawn_particles(
                 self.player.x + self.player.width / 2,
