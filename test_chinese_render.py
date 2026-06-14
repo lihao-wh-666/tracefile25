@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 test_chinese_render.py - 中文渲染质量测试脚本
 

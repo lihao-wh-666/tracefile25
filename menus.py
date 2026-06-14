@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 menus.py - 游戏菜单系统模块
 

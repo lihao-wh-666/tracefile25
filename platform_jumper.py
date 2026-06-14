@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 platform_jumper.py - 平台跳跃游戏主入口
 
@@ -22,6 +23,16 @@ platform_jumper.py - 平台跳跃游戏主入口
     SCREEN_HEIGHT=N          窗口高度（默认 640）
     FPS=N                    帧率限制（默认 60）
 """
+
+import os
+import sys
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 import pygame
 

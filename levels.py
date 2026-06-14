@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 levels.py - 多关卡数据定义模块
 

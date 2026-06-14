@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 test_menus.py - 菜单系统单元测试
 

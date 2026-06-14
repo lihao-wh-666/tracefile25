@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 audio.py - 游戏音频系统模块
 

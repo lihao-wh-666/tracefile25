@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 config.py - 游戏配置模块
 

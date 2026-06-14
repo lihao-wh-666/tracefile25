@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 entities.py - 游戏实体模块
 
