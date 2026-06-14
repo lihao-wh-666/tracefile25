@@ -442,6 +442,8 @@ class Player:
         self.ranged_shot_timer = 0
         self.muzzle_flash_timer = 0
 
+        self.weapon_state = "none"
+
     def get_rect(self):
         """返回玩家碰撞矩形。"""
         return pygame.Rect(self.x, self.y, self.width, self.height)
@@ -454,6 +456,7 @@ class Player:
         self.melee_cooldown = MELEE_COOLDOWN_FRAMES
         self.melee_hit_done = False
         self.melee_angle = -MELEE_ARC_HALF
+        self.weapon_state = "knife"
         if self.on_melee_swing:
             self.on_melee_swing()
         return True
@@ -472,6 +475,8 @@ class Player:
         vx = RANGED_PROJECTILE_SPEED * direction
         vy = -1.0
 
+        self.weapon_state = "gun"
+
         if self.on_ranged_shot:
             self.on_ranged_shot()
 
@@ -485,6 +490,7 @@ class Player:
             return False
         self.reloading = True
         self.reload_timer = RANGED_RELOAD_FRAMES
+        self.weapon_state = "gun"
         if self.on_reload:
             self.on_reload()
         return True
@@ -935,23 +941,24 @@ class Player:
 
         knife_hand_x = front_arm_x + front_arm_offset_x + 2
         knife_hand_y = front_arm_y + 5
-        if self.melee_active:
-            progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
-            base_angle = 0 if self.facing_right else math.pi
-            swing_start = base_angle + math.radians(-MELEE_ARC_HALF * 0.55)
-            swing_end = base_angle + math.radians(MELEE_ARC_HALF * 0.55)
-            knife_angle = swing_start + (swing_end - swing_start) * progress
-            self._draw_front_arm(surface, front_arm_x, front_arm_y, knife_hand_x, knife_hand_y, direction)
-            self._draw_knife(surface, knife_hand_x, knife_hand_y, knife_angle, camera_x)
-            self._draw_melee_effects(surface, camera_x, None, progress, base_angle, direction)
-        else:
-            rest_angle = math.radians(direction * 30)
-            base_angle = 0 if self.facing_right else math.pi
-            knife_angle = base_angle + rest_angle
-            self._draw_front_arm(surface, front_arm_x, front_arm_y, knife_hand_x, knife_hand_y, direction)
-            self._draw_knife(surface, knife_hand_x, knife_hand_y, knife_angle, camera_x)
+        base_angle = 0 if self.facing_right else math.pi
 
-        if not self.climbing:
+        self._draw_front_arm(surface, front_arm_x, front_arm_y, knife_hand_x, knife_hand_y, direction)
+
+        if self.weapon_state == "knife":
+            if self.melee_active:
+                progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
+                swing_start = base_angle + math.radians(-MELEE_ARC_HALF * 0.55)
+                swing_end = base_angle + math.radians(MELEE_ARC_HALF * 0.55)
+                knife_angle = swing_start + (swing_end - swing_start) * progress
+                self._draw_knife(surface, knife_hand_x, knife_hand_y, knife_angle, camera_x)
+                self._draw_melee_effects(surface, camera_x, None, progress, base_angle, direction)
+            else:
+                rest_angle = math.radians(direction * 30)
+                knife_angle = base_angle + rest_angle
+                self._draw_knife(surface, knife_hand_x, knife_hand_y, knife_angle, camera_x)
+
+        if not self.climbing and self.weapon_state == "gun":
             gun_hand_x = (body_right + 2 + front_arm_offset_x) if direction > 0 else (body_left - 2 + front_arm_offset_x)
             gun_hand_y = body_top + 17 + (front_arm_y - arm_shoulder_y)
             if self.melee_active:
@@ -961,7 +968,7 @@ class Player:
                 gun_angle = base_angle + math.radians(direction * 3)
                 self._draw_gun(surface, gun_hand_x, gun_hand_y, gun_angle, direction, camera_x)
 
-        if self.muzzle_flash_timer > 0 and not self.climbing:
+        if self.muzzle_flash_timer > 0 and not self.climbing and self.weapon_state == "gun":
             self._draw_muzzle_flash(surface, camera_x, None, direction)
 
         if self.reloading:
