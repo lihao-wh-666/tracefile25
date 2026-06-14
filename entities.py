@@ -17,6 +17,14 @@ from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, GRAVITY, JUMP_FORCE, MOVE_SPEED,
     MAX_FALL_SPEED, ACCELERATION, FRICTION,
     PLAYER_BODY, PLAYER_DARK, PLAYER_LIGHT, PLAYER_EYE, PLAYER_PUPIL,
+    PLAYER_SKIN, PLAYER_SKIN_DARK, PLAYER_SKIN_SHADOW,
+    PLAYER_HAT, PLAYER_HAT_DARK, PLAYER_HAT_BAND, PLAYER_HAT_BRIM,
+    PLAYER_SHIRT, PLAYER_SHIRT_DARK, PLAYER_SHIRT_LIGHT,
+    PLAYER_PANTS, PLAYER_PANTS_DARK,
+    PLAYER_SHOES, PLAYER_SHOES_LIGHT,
+    PLAYER_BELT, PLAYER_BELT_BUCKLE,
+    PLAYER_GLOVE, PLAYER_GLOVE_DARK,
+    PLAYER_HAIR, PLAYER_HAIR_DARK, PLAYER_CHEEK,
     COIN_COLOR, COIN_DARK, COIN_COLLECT_ANIM, COIN_BOB_AMPLITUDE,
     GROUND_COLOR, DIRT_COLOR, PLATFORM_COLOR, PLATFORM_TOP_COLOR,
     PLATFORM_HIGHLIGHT, GRASS_DARK, GRASS_LIGHT, GRASS_TUFT_DARK,
@@ -825,17 +833,15 @@ class Player:
 
     def draw(self, surface, camera_x):
         """
-        绘制玩家角色。
+        绘制玩家角色（像素风格冒险者）。
 
-        包含以下视觉层次：
-        1. 阴影（偏移深色背景）
-        2. 身体主色 + 顶部高光
-        3. 脚部（仅跑步时）
-        4. 手臂（攀爬时显示交替摆臂动画）
-        5. 眼睛（含眨眼动画和朝向偏移）
-
-        整体应用挤压拉伸变换模拟卡通弹性。
-        攀爬状态下身体会有微妙的左右摆动。
+        角色结构（从上到下）：
+        1. 帽子（红色棒球帽）
+        2. 头发（两侧棕色）
+        3. 脸部（肤色，带眼睛、脸颊）
+        4. 身体（蓝色衬衫 + 棕色腰带）
+        5. 手臂（持武器）
+        6. 腿（深蓝色裤子 + 棕色鞋子）
 
         Args:
             surface: 目标绘制 Surface
@@ -859,151 +865,109 @@ class Player:
             sway = math.sin(self.climb_anim) * 2
             cx += sway
 
-        draw_w = self.width * stretch_x
-        draw_h = self.height * stretch_y
-
-        body_rect = pygame.Rect(
-            cx - draw_w / 2,
-            cy - draw_h / 2 + 2 * (1 - stretch_y),
-            draw_w,
-            draw_h,
-        )
-
-        shadow_rect = pygame.Rect(
-            body_rect.x + 2,
-            body_rect.y + 2,
-            body_rect.width,
-            body_rect.height,
-        )
-        pygame.draw.rect(surface, PLAYER_DARK, shadow_rect, border_radius=5)
-        pygame.draw.rect(surface, PLAYER_BODY, body_rect, border_radius=5)
-
-        highlight_rect = pygame.Rect(
-            body_rect.x + 3,
-            body_rect.y + 3,
-            body_rect.width - 6,
-            body_rect.height / 3,
-        )
-        pygame.draw.rect(surface, PLAYER_LIGHT, highlight_rect, border_radius=3)
-
-        if self.climbing:
-            arm_swing = math.sin(self.climb_anim * 2) * 6
-            arm_y_top = body_rect.y + body_rect.height * 0.3
-            arm_y_bot = body_rect.y + body_rect.height * 0.7
-            left_arm_x = body_rect.centerx - draw_w / 2 - 3
-            right_arm_x = body_rect.centerx + draw_w / 2 + 3
-            pygame.draw.line(
-                surface,
-                PLAYER_DARK,
-                (int(left_arm_x), int(arm_y_top - arm_swing)),
-                (int(left_arm_x), int(arm_y_bot - arm_swing)),
-                3,
-            )
-            pygame.draw.line(
-                surface,
-                PLAYER_DARK,
-                (int(right_arm_x), int(arm_y_top + arm_swing)),
-                (int(right_arm_x), int(arm_y_bot + arm_swing)),
-                3,
-            )
-        elif self.on_ground and abs(self.vx) > 0.5:
-            leg_offset = math.sin(self.run_anim) * 3
-            foot_y = body_rect.bottom
-            foot_lx = body_rect.centerx - 5 + leg_offset
-            foot_rx = body_rect.centerx + 5 - leg_offset
-            pygame.draw.circle(surface, PLAYER_DARK, (int(foot_lx), int(foot_y)), 3)
-            pygame.draw.circle(surface, PLAYER_DARK, (int(foot_rx), int(foot_y)), 3)
-
         direction = 1 if self.facing_right else -1
 
-        eye_y = body_rect.y + body_rect.height * 0.3
+        head_y = sy + 8
+        head_r = 7
+        head_cx = cx
 
-        if self.eye_blink > 0:
-            blink_y = int(eye_y)
-            if self.facing_right:
-                pygame.draw.line(
-                    surface,
-                    PLAYER_PUPIL,
-                    (int(body_rect.centerx + 3), blink_y),
-                    (int(body_rect.centerx + 9), blink_y),
-                    2,
-                )
-                pygame.draw.line(
-                    surface,
-                    PLAYER_PUPIL,
-                    (int(body_rect.centerx - 5), blink_y),
-                    (int(body_rect.centerx + 1), blink_y),
-                    2,
-                )
-            else:
-                pygame.draw.line(
-                    surface,
-                    PLAYER_PUPIL,
-                    (int(body_rect.centerx - 9), blink_y),
-                    (int(body_rect.centerx - 3), blink_y),
-                    2,
-                )
-                pygame.draw.line(
-                    surface,
-                    PLAYER_PUPIL,
-                    (int(body_rect.centerx - 1), blink_y),
-                    (int(body_rect.centerx + 5), blink_y),
-                    2,
-                )
+        neck_y = head_y + head_r + 2
+
+        body_top = neck_y + 3
+        body_bottom = sy + self.height - 10
+        body_left = cx - 9
+        body_right = cx + 9
+        body_w = body_right - body_left
+
+        belt_y = body_top + 11
+        belt_h = 3
+
+        pants_top = belt_y + belt_h
+        pants_bottom = sy + self.height - 6
+
+        shoe_top = pants_bottom
+        shoe_bottom = sy + self.height
+
+        if self.on_ground and abs(self.vx) > 0.5:
+            leg_swing = math.sin(self.run_anim) * 4
+            leg1_off = leg_swing
+            leg2_off = -leg_swing
         else:
-            look_offset = 2 if self.facing_right else -2
-            if self.facing_right:
-                ex1 = body_rect.centerx - 4
-                ex2 = body_rect.centerx + 4
-            else:
-                ex1 = body_rect.centerx - 6
-                ex2 = body_rect.centerx + 2
+            leg1_off = 0
+            leg2_off = 0
 
-            pygame.draw.circle(surface, PLAYER_EYE, (int(ex1), int(eye_y)), 4)
-            pygame.draw.circle(surface, PLAYER_EYE, (int(ex2), int(eye_y)), 4)
-            pygame.draw.circle(
-                surface, PLAYER_PUPIL, (int(ex1 + look_offset), int(eye_y)), 2
-            )
-            pygame.draw.circle(
-                surface, PLAYER_PUPIL, (int(ex2 + look_offset), int(eye_y)), 2
-            )
+        if not self.on_ground and self.vy < 0:
+            leg1_off = -1
+            leg2_off = 2
+
+        left_leg_x = cx - 4 + leg1_off * 0.5
+        right_leg_x = cx + 4 + leg2_off * 0.5
+
+        arm_shoulder_y = body_top + 4
+        front_arm_x = body_right + 2
+        back_arm_x = body_left - 2
+
+        front_arm_offset_x = 0
+        back_arm_offset_x = 0
+
+        if self.climbing:
+            climb_arm = math.sin(self.climb_anim * 2) * 5
+            front_arm_y = arm_shoulder_y + climb_arm
+            back_arm_y = arm_shoulder_y - climb_arm
+        else:
+            front_arm_y = arm_shoulder_y
+            back_arm_y = arm_shoulder_y
+            if self.on_ground and abs(self.vx) > 0.5:
+                arm_swing_y = math.sin(self.run_anim + math.pi) * 3
+                arm_swing_x = math.sin(self.run_anim + math.pi) * 2
+                front_arm_y += arm_swing_y
+                front_arm_offset_x = -arm_swing_x * direction
+                back_arm_y -= arm_swing_y
+                back_arm_offset_x = arm_swing_x * direction
+
+        self._draw_back_arm(surface, back_arm_x + back_arm_offset_x, back_arm_y, direction)
+
+        self._draw_legs(surface, left_leg_x, right_leg_x, pants_top, pants_bottom, shoe_top, shoe_bottom)
+
+        self._draw_body(surface, body_left, body_right, body_top, body_bottom, belt_y, belt_h, cx)
+
+        self._draw_head(surface, head_cx, head_y, head_r, direction)
+
+        knife_hand_x = front_arm_x + front_arm_offset_x + 2
+        knife_hand_y = front_arm_y + 5
+        if self.melee_active:
+            progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
+            base_angle = 0 if self.facing_right else math.pi
+            swing_start = base_angle + math.radians(-MELEE_ARC_HALF * 0.55)
+            swing_end = base_angle + math.radians(MELEE_ARC_HALF * 0.55)
+            knife_angle = swing_start + (swing_end - swing_start) * progress
+            self._draw_front_arm(surface, front_arm_x, front_arm_y, knife_hand_x, knife_hand_y, direction)
+            self._draw_knife(surface, knife_hand_x, knife_hand_y, knife_angle, camera_x)
+            self._draw_melee_effects(surface, camera_x, None, progress, base_angle, direction)
+        else:
+            rest_angle = math.radians(direction * 30)
+            base_angle = 0 if self.facing_right else math.pi
+            knife_angle = base_angle + rest_angle
+            self._draw_front_arm(surface, front_arm_x, front_arm_y, knife_hand_x, knife_hand_y, direction)
+            self._draw_knife(surface, knife_hand_x, knife_hand_y, knife_angle, camera_x)
 
         if not self.climbing:
-            gun_hand_x = body_rect.centerx + direction * (draw_w / 2 + 1)
-            gun_hand_y = body_rect.y + body_rect.height * 0.75
+            gun_hand_x = (body_right + 2 + front_arm_offset_x) if direction > 0 else (body_left - 2 + front_arm_offset_x)
+            gun_hand_y = body_top + 17 + (front_arm_y - arm_shoulder_y)
             if self.melee_active:
-                tucked_angle = math.radians(direction * 65)
-                base_angle = 0 if self.facing_right else math.pi
-                self._draw_gun(surface, gun_hand_x, gun_hand_y, base_angle + tucked_angle, direction, camera_x)
+                gun_angle = base_angle + math.radians(direction * 60)
+                self._draw_gun(surface, gun_hand_x, gun_hand_y + 4, gun_angle, direction, camera_x)
             else:
-                gun_angle = 0.0 if self.facing_right else math.pi
-                gun_angle += math.radians(direction * 3)
+                gun_angle = base_angle + math.radians(direction * 3)
                 self._draw_gun(surface, gun_hand_x, gun_hand_y, gun_angle, direction, camera_x)
 
-        if not self.climbing:
-            front_hand_x = body_rect.centerx + direction * (draw_w / 2 + 4)
-            front_hand_y = body_rect.y + body_rect.height * 0.55
-            if self.melee_active:
-                progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
-                base_angle = 0 if self.facing_right else math.pi
-                swing_start = base_angle + math.radians(-MELEE_ARC_HALF * 0.6)
-                swing_end = base_angle + math.radians(MELEE_ARC_HALF * 0.6)
-                knife_angle = swing_start + (swing_end - swing_start) * progress
-                self._draw_knife(surface, front_hand_x, front_hand_y, knife_angle, camera_x)
-                self._draw_melee_effects(surface, camera_x, body_rect, progress, base_angle, direction)
-            else:
-                rest_angle = math.radians(direction * 35)
-                base_angle = 0 if self.facing_right else math.pi
-                knife_angle = base_angle + rest_angle
-                self._draw_knife(surface, front_hand_x, front_hand_y, knife_angle, camera_x)
-
         if self.muzzle_flash_timer > 0 and not self.climbing:
-            self._draw_muzzle_flash(surface, camera_x, body_rect, direction)
+            self._draw_muzzle_flash(surface, camera_x, None, direction)
 
         if self.reloading:
             reload_progress = 1.0 - self.reload_timer / RANGED_RELOAD_FRAMES
             rcx = self.x + self.width / 2 - camera_x
-            rcy = self.y - 12
+            rcy = self.y - 10
             arc_radius = 8
             start_angle = -math.pi / 2
             end_angle = start_angle + 2 * math.pi * reload_progress
@@ -1011,6 +975,216 @@ class Player:
                 rect = pygame.Rect(rcx - arc_radius, rcy - arc_radius,
                                    arc_radius * 2, arc_radius * 2)
                 pygame.draw.arc(surface, RANGED_COLOR, rect, start_angle, end_angle, 2)
+
+    def _draw_head(self, surface, cx, top_y, radius, direction):
+        head_cy = top_y + radius
+
+        hair_color = PLAYER_HAIR
+        hair_dark = PLAYER_HAIR_DARK
+        hat_color = PLAYER_HAT
+        hat_dark = PLAYER_HAT_DARK
+        hat_brim = PLAYER_HAT_BRIM
+        hat_band = PLAYER_HAT_BAND
+
+        face_color = PLAYER_SKIN
+        face_shadow = PLAYER_SKIN_SHADOW
+
+        pygame.draw.circle(surface, face_color, (int(cx), int(head_cy)), radius)
+
+        shadow_side = cx - radius if direction > 0 else cx + radius
+        shadow_rect = pygame.Rect(
+            shadow_side - 2 if direction > 0 else shadow_side,
+            top_y + 2,
+            3,
+            radius * 2 - 3,
+        )
+        pygame.draw.rect(surface, face_shadow, shadow_rect)
+
+        hair_top_y = top_y - 2
+        hair_left_x = cx - radius + 1
+        hair_right_x = cx + radius - 1
+        hair_points = [
+            (int(hair_left_x), int(top_y + 2)),
+            (int(cx - 3), int(hair_top_y)),
+            (int(cx + 3), int(hair_top_y)),
+            (int(hair_right_x), int(top_y + 2)),
+        ]
+        pygame.draw.polygon(surface, hair_color, hair_points)
+        pygame.draw.line(surface, hair_dark,
+                         (int(hair_left_x), int(top_y + 3)),
+                         (int(hair_left_x + 1), int(hair_top_y + 2)), 1)
+        pygame.draw.line(surface, hair_dark,
+                         (int(hair_right_x), int(top_y + 3)),
+                         (int(hair_right_x - 1), int(hair_top_y + 2)), 1)
+
+        hat_top_y = hair_top_y - 6
+        hat_left = cx - radius - 1
+        hat_right = cx + radius + 1
+        hat_height = 8
+
+        hat_body_points = [
+            (int(hat_left + 1), int(hair_top_y)),
+            (int(hat_left + 2), int(hat_top_y + 2)),
+            (int(cx - 2), int(hat_top_y)),
+            (int(cx + 2), int(hat_top_y)),
+            (int(hat_right - 2), int(hat_top_y + 2)),
+            (int(hat_right - 1), int(hair_top_y)),
+        ]
+        pygame.draw.polygon(surface, hat_color, hat_body_points)
+
+        band_y = hair_top_y - 1
+        pygame.draw.rect(surface, hat_band,
+                         (int(hat_left), int(band_y), int(hat_right - hat_left), 2))
+
+        brim_front_x = cx + direction * (radius + 5)
+        brim_back_x = cx - direction * (radius - 1)
+        brim_y = hair_top_y + 1
+        pygame.draw.line(surface, hat_brim,
+                         (int(brim_back_x), int(brim_y)),
+                         (int(brim_front_x), int(brim_y)), 3)
+        pygame.draw.line(surface, hat_dark,
+                         (int(brim_back_x), int(brim_y + 2)),
+                         (int(brim_front_x), int(brim_y + 2)), 1)
+
+        pygame.draw.line(surface, hat_dark,
+                         (int(hat_left + 2), int(hat_top_y + 3)),
+                         (int(hat_left + 3), int(hair_top_y)), 1)
+        pygame.draw.line(surface, hat_dark,
+                         (int(hat_right - 2), int(hat_top_y + 3)),
+                         (int(hat_right - 3), int(hair_top_y)), 1)
+
+        eye_y = head_cy - 1
+        eye_spacing = 4
+        eye_r = 2
+
+        eye_offset = direction * 1
+
+        left_eye_x = cx - eye_spacing + eye_offset
+        right_eye_x = cx + eye_spacing + eye_offset
+
+        if self.eye_blink > 0:
+            pygame.draw.line(surface, PLAYER_PUPIL,
+                             (int(left_eye_x - eye_r), int(eye_y)),
+                             (int(left_eye_x + eye_r), int(eye_y)), 1)
+            pygame.draw.line(surface, PLAYER_PUPIL,
+                             (int(right_eye_x - eye_r), int(eye_y)),
+                             (int(right_eye_x + eye_r), int(eye_y)), 1)
+        else:
+            pygame.draw.circle(surface, PLAYER_EYE, (int(left_eye_x), int(eye_y)), eye_r)
+            pygame.draw.circle(surface, PLAYER_EYE, (int(right_eye_x), int(eye_y)), eye_r)
+            pygame.draw.circle(surface, PLAYER_PUPIL,
+                               (int(left_eye_x + direction * 1), int(eye_y)), 1)
+            pygame.draw.circle(surface, PLAYER_PUPIL,
+                               (int(right_eye_x + direction * 1), int(eye_y)), 1)
+
+        cheek_y = eye_y + 4
+        cheek_x_off = 6
+        pygame.draw.circle(surface, PLAYER_CHEEK,
+                           (int(cx - cheek_x_off), int(cheek_y)), 2)
+        pygame.draw.circle(surface, PLAYER_CHEEK,
+                           (int(cx + cheek_x_off), int(cheek_y)), 2)
+
+    def _draw_body(self, surface, left, right, top, bottom, belt_y, belt_h, cx):
+        shirt_color = PLAYER_SHIRT
+        shirt_dark = PLAYER_SHIRT_DARK
+        shirt_light = PLAYER_SHIRT_LIGHT
+        belt_color = PLAYER_BELT
+        buckle_color = PLAYER_BELT_BUCKLE
+
+        body_points = [
+            (int(left + 1), int(top)),
+            (int(left + 2), int(bottom)),
+            (int(right - 2), int(bottom)),
+            (int(right - 1), int(top)),
+        ]
+        pygame.draw.polygon(surface, shirt_color, body_points)
+
+        shadow_x = left if self.facing_right else right
+        shadow_w = 3
+        pygame.draw.rect(surface, shirt_dark,
+                         (int(shadow_x - 1 if not self.facing_right else shadow_x),
+                          int(top + 1),
+                          shadow_w,
+                          int(bottom - top - 1)))
+
+        highlight_x = right if self.facing_right else left
+        pygame.draw.rect(surface, shirt_light,
+                         (int(highlight_x - 1 if self.facing_right else highlight_x),
+                          int(top + 2),
+                          2,
+                          int(bottom - top - 4)))
+
+        pygame.draw.rect(surface, belt_color,
+                         (int(left), int(belt_y), int(right - left), belt_h))
+        buckle_w = 4
+        pygame.draw.rect(surface, buckle_color,
+                         (int(cx - buckle_w / 2), int(belt_y - 1), buckle_w, belt_h + 2))
+        pygame.draw.line(surface, (180, 150, 60),
+                         (int(cx - buckle_w / 2 + 1), int(belt_y + 1)),
+                         (int(cx + buckle_w / 2 - 1), int(belt_y + 1)), 1)
+
+    def _draw_legs(self, surface, left_x, right_x, top, bottom, shoe_top, shoe_bottom):
+        pants_color = PLAYER_PANTS
+        pants_dark = PLAYER_PANTS_DARK
+        shoe_color = PLAYER_SHOES
+        shoe_light = PLAYER_SHOES_LIGHT
+
+        leg_w = 5
+
+        left_leg_rect = pygame.Rect(int(left_x - leg_w / 2), int(top), leg_w, int(bottom - top))
+        right_leg_rect = pygame.Rect(int(right_x - leg_w / 2), int(top), leg_w, int(bottom - top))
+        pygame.draw.rect(surface, pants_color, left_leg_rect)
+        pygame.draw.rect(surface, pants_color, right_leg_rect)
+
+        pygame.draw.rect(surface, pants_dark,
+                         (int(left_x - leg_w / 2), int(top), 1, int(bottom - top)))
+        pygame.draw.rect(surface, pants_dark,
+                         (int(right_x - leg_w / 2), int(top), 1, int(bottom - top)))
+
+        shoe_h = shoe_bottom - shoe_top
+        left_shoe_rect = pygame.Rect(int(left_x - 4), int(shoe_top), 8, shoe_h)
+        right_shoe_rect = pygame.Rect(int(right_x - 4), int(shoe_top), 8, shoe_h)
+        pygame.draw.rect(surface, shoe_color, left_shoe_rect, border_radius=1)
+        pygame.draw.rect(surface, shoe_color, right_shoe_rect, border_radius=1)
+
+        pygame.draw.rect(surface, shoe_light,
+                         (int(left_x - 3), int(shoe_top + 1), 3, 1))
+        pygame.draw.rect(surface, shoe_light,
+                         (int(right_x - 3), int(shoe_top + 1), 3, 1))
+
+    def _draw_back_arm(self, surface, x, y, direction):
+        sleeve_color = PLAYER_SHIRT_DARK
+        glove_color = PLAYER_GLOVE_DARK
+
+        arm_len = 8
+        arm_end_y = y + arm_len
+
+        pygame.draw.line(surface, sleeve_color,
+                         (int(x), int(y)),
+                         (int(x), int(arm_end_y - 2)), 3)
+
+        pygame.draw.circle(surface, glove_color,
+                           (int(x), int(arm_end_y)), 3)
+
+    def _draw_front_arm(self, surface, shoulder_x, shoulder_y, hand_x, hand_y, direction):
+        sleeve_color = PLAYER_SHIRT
+        glove_color = PLAYER_GLOVE
+        glove_dark = PLAYER_GLOVE_DARK
+
+        mid_x = (shoulder_x + hand_x) / 2
+        mid_y = (shoulder_y + hand_y) / 2 + 2
+
+        pygame.draw.line(surface, sleeve_color,
+                         (int(shoulder_x), int(shoulder_y)),
+                         (int(mid_x), int(mid_y)), 4)
+        pygame.draw.line(surface, glove_color,
+                         (int(mid_x), int(mid_y)),
+                         (int(hand_x), int(hand_y - 2)), 3)
+
+        pygame.draw.circle(surface, glove_color,
+                           (int(hand_x), int(hand_y)), 4)
+        pygame.draw.circle(surface, glove_dark,
+                           (int(hand_x - direction * 1), int(hand_y + 1)), 2)
 
     def _draw_knife(self, surface, hand_x, hand_y, angle, camera_x):
         hx = hand_x
@@ -1027,8 +1201,8 @@ class Player:
         handle_poly = [
             (int(hx + perp_x * handle_w), int(hy + perp_y * handle_w)),
             (int(hx - perp_x * handle_w), int(hy - perp_y * handle_w)),
-            (int(handle_end_x - perp_x * handle_w), int(handle_end_y - perp_y * handle_w)),
-            (int(handle_end_x + perp_x * handle_w), int(handle_end_y + perp_y * handle_w)),
+            (int(handle_end_x - perp_x * (handle_w - 0.5)), int(handle_end_y - perp_y * (handle_w - 0.5))),
+            (int(handle_end_x + perp_x * (handle_w - 0.5)), int(handle_end_y + perp_y * (handle_w - 0.5))),
         ]
         pygame.draw.polygon(surface, KNIFE_HANDLE_COLOR, handle_poly)
 
@@ -1036,58 +1210,82 @@ class Player:
             wrap_t = (i + 1) / 4
             wx = hx + cos_a * KNIFE_HANDLE_LENGTH * wrap_t
             wy = hy + sin_a * KNIFE_HANDLE_LENGTH * wrap_t
+            w_w = handle_w - (wrap_t * 0.5)
             pygame.draw.line(surface, KNIFE_HANDLE_WRAP,
-                             (int(wx + perp_x * handle_w), int(wy + perp_y * handle_w)),
-                             (int(wx - perp_x * handle_w), int(wy - perp_y * handle_w)), 1)
+                             (int(wx + perp_x * w_w), int(wy + perp_y * w_w)),
+                             (int(wx - perp_x * w_w), int(wy - perp_y * w_w)), 1)
 
-        guard_w = 6
-        guard_start_x = handle_end_x + cos_a * 1
-        guard_start_y = handle_end_y + sin_a * 1
-        pygame.draw.line(surface, KNIFE_GUARD_DARK,
-                         (int(guard_start_x - perp_x * guard_w), int(guard_start_y - perp_y * guard_w)),
-                         (int(guard_start_x + perp_x * guard_w), int(guard_start_y + perp_y * guard_w)), 3)
+        pommel_x = hx - cos_a * 1
+        pommel_y = hy - sin_a * 1
+        pygame.draw.circle(surface, KNIFE_GUARD_COLOR,
+                           (int(pommel_x), int(pommel_y)), 3)
+        pygame.draw.circle(surface, KNIFE_GUARD_DARK,
+                           (int(pommel_x - perp_x * 1), int(pommel_y - perp_y * 1)), 1)
+
+        guard_w = 7
+        guard_h = 2
+        guard_center_x = handle_end_x + cos_a * 1
+        guard_center_y = handle_end_y + sin_a * 1
+        guard_poly = [
+            (int(guard_center_x - perp_x * guard_w - cos_a * guard_h),
+             int(guard_center_y - perp_y * guard_w - sin_a * guard_h)),
+            (int(guard_center_x - perp_x * guard_w + cos_a * guard_h),
+             int(guard_center_y - perp_y * guard_w + sin_a * guard_h)),
+            (int(guard_center_x + perp_x * guard_w + cos_a * guard_h),
+             int(guard_center_y + perp_y * guard_w + sin_a * guard_h)),
+            (int(guard_center_x + perp_x * guard_w - cos_a * guard_h),
+             int(guard_center_y + perp_y * guard_w - sin_a * guard_h)),
+        ]
+        pygame.draw.polygon(surface, KNIFE_GUARD_DARK, guard_poly)
         pygame.draw.line(surface, KNIFE_GUARD_COLOR,
-                         (int(guard_start_x - perp_x * (guard_w - 1)), int(guard_start_y - perp_y * (guard_w - 1))),
-                         (int(guard_start_x + perp_x * (guard_w - 1)), int(guard_start_y + perp_y * (guard_w - 1))), 1)
+                         (int(guard_center_x - perp_x * (guard_w - 1)),
+                          int(guard_center_y - perp_y * (guard_w - 1))),
+                         (int(guard_center_x + perp_x * (guard_w - 1)),
+                          int(guard_center_y + perp_y * (guard_w - 1))), 2)
 
-        blade_base_x = guard_start_x + cos_a * 2
-        blade_base_y = guard_start_y + sin_a * 2
+        blade_base_x = guard_center_x + cos_a * 2
+        blade_base_y = guard_center_y + sin_a * 2
         blade_tip_x = blade_base_x + cos_a * KNIFE_LENGTH
         blade_tip_y = blade_base_y + sin_a * KNIFE_LENGTH
 
         bw = KNIFE_BLADE_WIDTH
-        mid_t = 0.75
+        mid_t = 0.65
         mid_x = blade_base_x + cos_a * KNIFE_LENGTH * mid_t
         mid_y = blade_base_y + sin_a * KNIFE_LENGTH * mid_t
 
         blade_poly = [
             (int(blade_base_x + perp_x * bw), int(blade_base_y + perp_y * bw)),
-            (int(mid_x + perp_x * bw * 0.9), int(mid_y + perp_y * bw * 0.9)),
+            (int(mid_x + perp_x * bw * 0.85), int(mid_y + perp_y * bw * 0.85)),
             (int(blade_tip_x), int(blade_tip_y)),
-            (int(mid_x - perp_x * bw * 0.6), int(mid_y - perp_y * bw * 0.6)),
-            (int(blade_base_x - perp_x * bw), int(blade_base_y - perp_y * bw)),
+            (int(mid_x - perp_x * bw * 0.5), int(mid_y - perp_y * bw * 0.5)),
+            (int(blade_base_x - perp_x * bw * 0.8), int(blade_base_y - perp_y * bw * 0.8)),
         ]
         pygame.draw.polygon(surface, KNIFE_BLADE_COLOR, blade_poly)
 
         edge_pts = [
             (int(blade_base_x + perp_x * bw), int(blade_base_y + perp_y * bw)),
-            (int(mid_x + perp_x * (bw * 0.3)), int(mid_y + perp_y * (bw * 0.3))),
+            (int(mid_x + perp_x * (bw * 0.4)), int(mid_y + perp_y * (bw * 0.4))),
             (int(blade_tip_x + perp_x * 0.5), int(blade_tip_y + perp_y * 0.5)),
         ]
         pygame.draw.polygon(surface, KNIFE_BLADE_HIGHLIGHT, edge_pts)
 
-        shadow_pts = [
-            (int(blade_base_x - perp_x * bw), int(blade_base_y - perp_y * bw)),
-            (int(mid_x - perp_x * bw * 0.5), int(mid_y - perp_y * bw * 0.5)),
+        spine_pts = [
+            (int(blade_base_x - perp_x * bw * 0.6), int(blade_base_y - perp_y * bw * 0.6)),
+            (int(mid_x - perp_x * bw * 0.3), int(mid_y - perp_y * bw * 0.3)),
             (int(blade_tip_x - perp_x * 0.3), int(blade_tip_y - perp_y * 0.3)),
         ]
-        pygame.draw.lines(surface, KNIFE_BLADE_SHADOW, False, shadow_pts, 1)
+        pygame.draw.lines(surface, KNIFE_BLADE_SHADOW, False, spine_pts, 1)
 
-        spine_x = blade_base_x + cos_a * (KNIFE_LENGTH * 0.5)
-        spine_y = blade_base_y + sin_a * (KNIFE_LENGTH * 0.5)
+        fuller_start = blade_base_x + cos_a * 3
+        fuller_start_y = blade_base_y + sin_a * 3
+        fuller_end = blade_base_x + cos_a * (KNIFE_LENGTH * 0.6)
+        fuller_end_y = blade_base_y + sin_a * (KNIFE_LENGTH * 0.6)
+        pygame.draw.line(surface, KNIFE_BLADE_SHADOW,
+                         (int(fuller_start + perp_x * 1.5), int(fuller_start_y + perp_y * 1.5)),
+                         (int(fuller_end + perp_x * 1), int(fuller_end_y + perp_y * 1)), 1)
         pygame.draw.line(surface, KNIFE_BLADE_HIGHLIGHT,
-                         (int(blade_base_x - perp_x * 0.5), int(blade_base_y - perp_y * 0.5)),
-                         (int(spine_x - perp_x * 0.5), int(spine_y - perp_y * 0.5)), 1)
+                         (int(fuller_start - perp_x * 1), int(fuller_start_y - perp_y * 1)),
+                         (int(fuller_end - perp_x * 0.5), int(fuller_end_y - perp_y * 0.5)), 1)
 
     def _draw_gun(self, surface, hand_x, hand_y, gun_angle, player_direction, camera_x):
         gx = hand_x
@@ -1194,10 +1392,39 @@ class Player:
                          (int(trigger_mid_x + cos_a * 1.5), int(trigger_mid_y + sin_a * 1.5)),
                          (int(trigger_mid_x - cos_a * 1.5), int(trigger_mid_y - sin_a * 1.5)), 2)
 
+        sight_x = body_start_x + cos_a * 6
+        sight_y = body_start_y + sin_a * 6
+        pygame.draw.rect(surface, GUN_BODY_HIGHLIGHT,
+                         (int(sight_x - 1), int(sight_y + perp_y * bh - 2), 3, 2))
+
+        front_sight_x = barrel_end_x - cos_a * 3
+        front_sight_y = barrel_end_y - sin_a * 3
+        pygame.draw.line(surface, GUN_BODY_HIGHLIGHT,
+                         (int(front_sight_x), int(front_sight_y + perp_y * barrel_h - 1)),
+                         (int(front_sight_x - cos_a * 2), int(front_sight_y + perp_y * barrel_h + 1)), 2)
+
+        mag_x = body_start_x + cos_a * 10
+        mag_y = body_start_y + sin_a * 10
+        mag_h = 6
+        mag_w = 3
+        mag_poly = [
+            (int(mag_x - perp_x * mag_w + cos_a * 1), int(mag_y - perp_y * mag_w + sin_a * 1)),
+            (int(mag_x + perp_x * mag_w - cos_a * 0.5), int(mag_y + perp_y * mag_w - sin_a * 0.5)),
+            (int(mag_x + perp_x * (mag_w - 0.5) + perp_x * mag_h - cos_a * 1),
+             int(mag_y + perp_y * (mag_w - 0.5) + perp_y * mag_h - sin_a * 1)),
+            (int(mag_x - perp_x * (mag_w - 0.5) + perp_x * mag_h + cos_a * 0.5),
+             int(mag_y - perp_y * (mag_w - 0.5) + perp_y * mag_h + sin_a * 0.5)),
+        ]
+        pygame.draw.polygon(surface, GUN_BODY_SHADOW, mag_poly)
+        pygame.draw.line(surface, GUN_BODY_HIGHLIGHT,
+                         (int(mag_x - perp_x * (mag_w - 1) + perp_x * 1),
+                          int(mag_y - perp_y * (mag_w - 1) + perp_y * 1)),
+                         (int(mag_x - perp_x * (mag_w - 1) + perp_x * (mag_h - 1)),
+                          int(mag_y - perp_y * (mag_w - 1) + perp_y * (mag_h - 1))), 1)
+
     def _draw_melee_effects(self, surface, camera_x, body_rect, progress, base_angle, direction):
         pcx = self.x + self.width / 2 - camera_x
-        pcy = self.y + self.height * 0.62 - camera_x * 0
-        pcy = body_rect.y + body_rect.height * 0.62
+        pcy = self.y + self.height * 0.5
 
         swing_start = base_angle + math.radians(-MELEE_ARC_HALF * 0.7)
         swing_end = base_angle + math.radians(MELEE_ARC_HALF * 0.7)
@@ -1316,8 +1543,9 @@ class Player:
         perp_x = -sin_a
         perp_y = cos_a
 
-        gun_hand_x = body_rect.centerx + direction * (body_rect.width / 2 + 1)
-        gun_hand_y = body_rect.y + body_rect.height * 0.75
+        body_edge_x = self.x + self.width / 2 + direction * 11
+        gun_hand_x = body_edge_x - camera_x
+        gun_hand_y = self.y + 35
 
         recoil_offset = 0
         if self.ranged_shot_timer > 0:
