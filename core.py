@@ -636,14 +636,24 @@ class Game:
 
     def _handle_melee_input(self):
         if self.player.start_melee():
+            direction = 1 if self.player.facing_right else -1
             self._spawn_particles(
                 self.player.x + self.player.width / 2,
                 self.player.y + self.player.height / 2,
-                count=4,
+                count=6,
                 colors=MELEE_SWING_PARTICLE_COLORS,
-                spread=4,
-                life=8,
-                size=3,
+                spread=5,
+                life=10,
+                size=4,
+            )
+            self._spawn_particles(
+                self.player.x + self.player.width / 2 + direction * 20,
+                self.player.y + self.player.height / 2 - 5,
+                count=4,
+                colors=[(220, 230, 255), (255, 255, 255)],
+                spread=6,
+                life=6,
+                size=2,
             )
 
     def _handle_ranged_input(self):
@@ -651,13 +661,27 @@ class Game:
         if bullet is not None:
             self.bullets.append(bullet)
             direction = 1 if self.player.facing_right else -1
+            gun_angle = -0.15 if self.player.facing_right else math.pi + 0.15
+            cos_a = math.cos(gun_angle)
+            sin_a = math.sin(gun_angle)
+            muzzle_x = self.player.x + self.player.width / 2 + direction * 22 + cos_a * 32
+            muzzle_y = self.player.y + self.player.height * 0.5 + sin_a * 32
             self._spawn_particles(
-                self.player.x + self.player.width / 2 + direction * 15,
-                self.player.y + self.player.height / 2,
-                count=3,
+                muzzle_x,
+                muzzle_y,
+                count=8,
                 colors=RANGED_MUZZLE_PARTICLE_COLORS,
+                spread=5,
+                life=8,
+                size=3,
+            )
+            self._spawn_particles(
+                muzzle_x,
+                muzzle_y,
+                count=4,
+                colors=[(255, 255, 200), (255, 200, 100)],
                 spread=3,
-                life=6,
+                life=4,
                 size=2,
             )
 
@@ -679,21 +703,39 @@ class Game:
                             self._spawn_particles(
                                 enemy.x + enemy.width / 2,
                                 enemy.y + enemy.height / 2,
-                                count=6,
+                                count=10,
                                 colors=COMBAT_HIT_PARTICLE_COLORS,
-                                spread=4,
-                                life=12,
-                                size=4,
+                                spread=6,
+                                life=14,
+                                size=5,
+                            )
+                            self._spawn_particles(
+                                enemy.x + enemy.width / 2,
+                                enemy.y + enemy.height / 2,
+                                count=4,
+                                colors=[(255, 255, 255), (220, 230, 255)],
+                                spread=3,
+                                life=6,
+                                size=3,
                             )
                             if killed:
                                 self._spawn_particles(
                                     enemy.x + enemy.width / 2,
                                     enemy.y + enemy.height / 2,
-                                    count=15,
+                                    count=20,
                                     colors=ENEMY_PARTICLE_COLORS,
-                                    spread=6,
-                                    life=20,
-                                    size=5,
+                                    spread=8,
+                                    life=25,
+                                    size=6,
+                                )
+                                self._spawn_particles(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    count=6,
+                                    colors=[(255, 255, 200), (255, 255, 255)],
+                                    spread=4,
+                                    life=10,
+                                    size=3,
                                 )
                                 self.patrol_enemies.remove(enemy)
                                 self.score += 20
@@ -704,21 +746,39 @@ class Game:
                             self._spawn_particles(
                                 enemy.x + enemy.width / 2,
                                 enemy.y + enemy.height / 2,
-                                count=6,
+                                count=10,
                                 colors=COMBAT_HIT_PARTICLE_COLORS,
-                                spread=4,
-                                life=12,
-                                size=4,
+                                spread=6,
+                                life=14,
+                                size=5,
+                            )
+                            self._spawn_particles(
+                                enemy.x + enemy.width / 2,
+                                enemy.y + enemy.height / 2,
+                                count=4,
+                                colors=[(255, 255, 255), (220, 230, 255)],
+                                spread=3,
+                                life=6,
+                                size=3,
                             )
                             if killed:
                                 self._spawn_particles(
                                     enemy.x + enemy.width / 2,
                                     enemy.y + enemy.height / 2,
-                                    count=15,
+                                    count=20,
                                     colors=ENEMY_PARTICLE_COLORS,
-                                    spread=6,
-                                    life=20,
-                                    size=5,
+                                    spread=8,
+                                    life=25,
+                                    size=6,
+                                )
+                                self._spawn_particles(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    count=6,
+                                    colors=[(255, 255, 200), (255, 255, 255)],
+                                    spread=4,
+                                    life=10,
+                                    size=3,
                                 )
                                 self.chase_enemies.remove(enemy)
                                 self.score += 20
@@ -736,21 +796,29 @@ class Game:
                     self.audio.play_sfx(AudioManager.SFX_HIT_IMPACT)
                     self._spawn_particles(
                         bullet.x, bullet.y,
-                        count=5,
+                        count=8,
                         colors=RANGED_HIT_PARTICLE_COLORS,
-                        spread=3,
-                        life=10,
-                        size=3,
+                        spread=5,
+                        life=12,
+                        size=4,
+                    )
+                    self._spawn_particles(
+                        bullet.x, bullet.y,
+                        count=3,
+                        colors=[(255, 255, 200), (255, 200, 80)],
+                        spread=2,
+                        life=5,
+                        size=2,
                     )
                     if killed:
                         self._spawn_particles(
                             enemy.x + enemy.width / 2,
                             enemy.y + enemy.height / 2,
-                            count=15,
+                            count=20,
                             colors=ENEMY_PARTICLE_COLORS,
-                            spread=6,
-                            life=20,
-                            size=5,
+                            spread=8,
+                            life=25,
+                            size=6,
                         )
                         self.patrol_enemies.remove(enemy)
                         self.score += 20
@@ -764,21 +832,29 @@ class Game:
                     self.audio.play_sfx(AudioManager.SFX_HIT_IMPACT)
                     self._spawn_particles(
                         bullet.x, bullet.y,
-                        count=5,
+                        count=8,
                         colors=RANGED_HIT_PARTICLE_COLORS,
-                        spread=3,
-                        life=10,
-                        size=3,
+                        spread=5,
+                        life=12,
+                        size=4,
+                    )
+                    self._spawn_particles(
+                        bullet.x, bullet.y,
+                        count=3,
+                        colors=[(255, 255, 200), (255, 200, 80)],
+                        spread=2,
+                        life=5,
+                        size=2,
                     )
                     if killed:
                         self._spawn_particles(
                             enemy.x + enemy.width / 2,
                             enemy.y + enemy.height / 2,
-                            count=15,
+                            count=20,
                             colors=ENEMY_PARTICLE_COLORS,
-                            spread=6,
-                            life=20,
-                            size=5,
+                            spread=8,
+                            life=25,
+                            size=6,
                         )
                         self.chase_enemies.remove(enemy)
                         self.score += 20

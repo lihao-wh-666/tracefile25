@@ -52,6 +52,20 @@ from config import (
     RANGED_AMMO_PICKUP_AMOUNT, AMMO_PICKUP_COLOR, AMMO_PICKUP_DARK,
     ENEMY_KNOCKBACK_SPEED, ENEMY_KNOCKBACK_DURATION,
     PATROL_ENEMY_HP, CHASE_ENEMY_HP,
+    KNIFE_BLADE_COLOR, KNIFE_BLADE_HIGHLIGHT, KNIFE_HANDLE_COLOR,
+    KNIFE_HANDLE_WRAP, KNIFE_GUARD_COLOR, KNIFE_LENGTH,
+    KNIFE_HANDLE_LENGTH, KNIFE_BLADE_WIDTH,
+    KNIFE_SWING_GLOW_COLOR, KNIFE_SLASH_TRAIL_COLOR,
+    KNIFE_IMPACT_FLASH_COLOR,
+    GUN_BODY_COLOR, GUN_BODY_HIGHLIGHT, GUN_BARREL_COLOR,
+    GUN_GRIP_COLOR, GUN_GRIP_WRAP, GUN_BODY_LENGTH,
+    GUN_BARREL_LENGTH, GUN_BODY_HEIGHT,
+    GUN_RECOIL_FRAMES, GUN_RECOIL_DISTANCE,
+    MUZZLE_FLASH_COLOR, MUZZLE_FLASH_OUTER,
+    MUZZLE_FLASH_DURATION, MUZZLE_FLASH_SIZE,
+    MELEE_SLASH_GLOW_RADIUS, MELEE_SLASH_TRAIL_COUNT,
+    MELEE_IMPACT_RING_RADIUS, MELEE_IMPACT_RING_FRAMES,
+    MELEE_SCREEN_SHAKE_FRAMES, MELEE_SCREEN_SHAKE_INTENSITY,
 )
 
 
@@ -412,6 +426,9 @@ class Player:
         self.on_reload = None
         self.on_ammo_pickup = None
 
+        self.ranged_shot_timer = 0
+        self.muzzle_flash_timer = 0
+
     def get_rect(self):
         """返回玩家碰撞矩形。"""
         return pygame.Rect(self.x, self.y, self.width, self.height)
@@ -444,6 +461,9 @@ class Player:
 
         if self.on_ranged_shot:
             self.on_ranged_shot()
+
+        self.ranged_shot_timer = GUN_RECOIL_FRAMES
+        self.muzzle_flash_timer = MUZZLE_FLASH_DURATION
 
         return Bullet(cx + direction * 15, cy, vx, vy)
 
@@ -484,6 +504,11 @@ class Player:
 
         if self.ranged_cooldown > 0:
             self.ranged_cooldown -= 1
+
+        if self.ranged_shot_timer > 0:
+            self.ranged_shot_timer -= 1
+        if self.muzzle_flash_timer > 0:
+            self.muzzle_flash_timer -= 1
 
         if self.reloading:
             self.reload_timer -= 1
@@ -884,6 +909,45 @@ class Player:
             pygame.draw.circle(surface, PLAYER_DARK, (int(foot_lx), int(foot_y)), 3)
             pygame.draw.circle(surface, PLAYER_DARK, (int(foot_rx), int(foot_y)), 3)
 
+        direction = 1 if self.facing_right else -1
+        shoulder_x = body_rect.centerx + direction * (draw_w / 2 - 2)
+        shoulder_y = body_rect.y + body_rect.height * 0.35
+
+        if not self.climbing:
+            gun_hand_x = body_rect.centerx + direction * (draw_w / 2 + 2)
+            gun_hand_y = body_rect.y + body_rect.height * 0.5
+            self._draw_gun(surface, gun_hand_x, gun_hand_y, direction, camera_x)
+
+        knife_hand_x = body_rect.centerx + direction * (draw_w / 2 + 1)
+        knife_hand_y = body_rect.y + body_rect.height * 0.35
+        if self.melee_active:
+            progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
+            base_angle = 0 if self.facing_right else math.pi
+            swing_angle = -MELEE_ARC_HALF + progress * MELEE_ARC_HALF * 2
+            knife_angle = math.radians(swing_angle) * direction + base_angle
+            self._draw_knife(surface, knife_hand_x, knife_hand_y, knife_angle, camera_x)
+        else:
+            rest_angle = -0.3 if self.facing_right else math.pi + 0.3
+            self._draw_knife(surface, knife_hand_x, knife_hand_y, rest_angle, camera_x)
+
+        if self.melee_active:
+            self._draw_melee_effects(surface, camera_x, body_rect)
+
+        if self.muzzle_flash_timer > 0:
+            self._draw_muzzle_flash(surface, camera_x, body_rect, direction)
+
+        if self.reloading:
+            reload_progress = 1.0 - self.reload_timer / RANGED_RELOAD_FRAMES
+            rcx = self.x + self.width / 2 - camera_x
+            rcy = self.y - 12
+            arc_radius = 8
+            start_angle = -math.pi / 2
+            end_angle = start_angle + 2 * math.pi * reload_progress
+            if reload_progress > 0.01:
+                rect = pygame.Rect(rcx - arc_radius, rcy - arc_radius,
+                                   arc_radius * 2, arc_radius * 2)
+                pygame.draw.arc(surface, RANGED_COLOR, rect, start_angle, end_angle, 2)
+
         eye_y = body_rect.y + body_rect.height * 0.3
 
         if self.eye_blink > 0:
@@ -936,55 +1000,265 @@ class Player:
                 surface, PLAYER_PUPIL, (int(ex2 + look_offset), int(eye_y)), 2
             )
 
-        if self.melee_active:
-            progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
-            pcx = self.x + self.width / 2 - camera_x
-            pcy = self.y + self.height / 2
-            direction = 1 if self.facing_right else -1
-            base_angle = 0 if self.facing_right else 180
+    def _draw_knife(self, surface, hand_x, hand_y, angle, camera_x):
+        hx = hand_x
+        hy = hand_y
+        cos_a = math.cos(angle)
+        sin_a = math.sin(angle)
 
-            start_deg = base_angle - MELEE_ARC_HALF * direction
-            end_deg = base_angle + MELEE_ARC_HALF * direction
-            current_deg = start_deg + (end_deg - start_deg) * progress
+        handle_end_x = hx + cos_a * KNIFE_HANDLE_LENGTH
+        handle_end_y = hy + sin_a * KNIFE_HANDLE_LENGTH
+        pygame.draw.line(surface, KNIFE_HANDLE_COLOR,
+                         (int(hx), int(hy)),
+                         (int(handle_end_x), int(handle_end_y)), 4)
 
-            swing_surf = pygame.Surface((MELEE_RANGE * 2 + 20, MELEE_RANGE * 2 + 20), pygame.SRCALPHA)
-            scx = MELEE_RANGE + 10
-            scy = MELEE_RANGE + 10
+        wrap_t = 0.5
+        wrap_x = hx + cos_a * KNIFE_HANDLE_LENGTH * wrap_t
+        wrap_y = hy + sin_a * KNIFE_HANDLE_LENGTH * wrap_t
+        perp_x = -sin_a * 2
+        perp_y = cos_a * 2
+        pygame.draw.line(surface, KNIFE_HANDLE_WRAP,
+                         (int(wrap_x - perp_x), int(wrap_y - perp_y)),
+                         (int(wrap_x + perp_x), int(wrap_y + perp_y)), 2)
 
-            arc_steps = 12
-            arc_span = MELEE_ARC_HALF * 2
-            arc_start = -MELEE_ARC_HALF
-            for i in range(arc_steps):
-                t = i / arc_steps
-                a_deg = arc_start + t * arc_span
-                a_rad = math.radians(a_deg * direction + base_angle)
-                tip_x = scx + math.cos(a_rad) * MELEE_RANGE
-                tip_y = scy + math.sin(a_rad) * MELEE_RANGE
-                alpha = int(60 + 140 * t * (1 - abs(t - 0.5) * 2))
-                pygame.draw.line(swing_surf, (*MELEE_COLOR, alpha),
+        guard_perp_x = -sin_a * 3
+        guard_perp_y = cos_a * 3
+        pygame.draw.line(surface, KNIFE_GUARD_COLOR,
+                         (int(handle_end_x - guard_perp_x), int(handle_end_y - guard_perp_y)),
+                         (int(handle_end_x + guard_perp_x), int(handle_end_y + guard_perp_y)), 3)
+
+        blade_base_x = handle_end_x + cos_a * 2
+        blade_base_y = handle_end_y + sin_a * 2
+        blade_tip_x = handle_end_x + cos_a * KNIFE_LENGTH
+        blade_tip_y = handle_end_y + sin_a * KNIFE_LENGTH
+
+        blade_left_x = blade_base_x - sin_a * KNIFE_BLADE_WIDTH
+        blade_left_y = blade_base_y + cos_a * KNIFE_BLADE_WIDTH
+        blade_right_x = blade_base_x + sin_a * KNIFE_BLADE_WIDTH
+        blade_right_y = blade_base_y - cos_a * KNIFE_BLADE_WIDTH
+        blade_tip_left_x = blade_tip_x - sin_a * 1
+        blade_tip_left_y = blade_tip_y + cos_a * 1
+        blade_tip_right_x = blade_tip_x + sin_a * 0.5
+        blade_tip_right_y = blade_tip_y - cos_a * 0.5
+
+        blade_points = [
+            (int(blade_left_x), int(blade_left_y)),
+            (int(blade_tip_left_x), int(blade_tip_left_y)),
+            (int(blade_tip_right_x), int(blade_tip_right_y)),
+            (int(blade_right_x), int(blade_right_y)),
+        ]
+        pygame.draw.polygon(surface, KNIFE_BLADE_COLOR, blade_points)
+
+        edge_mid_t = 0.4
+        edge_x = handle_end_x + cos_a * KNIFE_LENGTH * edge_mid_t
+        edge_y = handle_end_y + sin_a * KNIFE_LENGTH * edge_mid_t
+        highlight_points = [
+            (int(blade_left_x + cos_a * 2), int(blade_left_y + sin_a * 2)),
+            (int(edge_x - sin_a * 0.5), int(edge_y + cos_a * 0.5)),
+            (int(blade_base_x + cos_a * 2), int(blade_base_y + sin_a * 2)),
+        ]
+        pygame.draw.polygon(surface, KNIFE_BLADE_HIGHLIGHT, highlight_points)
+
+    def _draw_gun(self, surface, hand_x, hand_y, direction, camera_x):
+        gx = hand_x
+        gy = hand_y
+
+        recoil_offset = 0
+        if self.ranged_shot_timer > 0:
+            recoil_t = self.ranged_shot_timer / GUN_RECOIL_FRAMES
+            recoil_offset = GUN_RECOIL_DISTANCE * recoil_t * direction
+
+        gun_angle = -0.15 if self.facing_right else math.pi + 0.15
+        cos_a = math.cos(gun_angle)
+        sin_a = math.sin(gun_angle)
+
+        body_start_x = gx + recoil_offset
+        body_start_y = gy
+        body_end_x = body_start_x + cos_a * GUN_BODY_LENGTH
+        body_end_y = body_start_y + sin_a * GUN_BODY_LENGTH
+
+        perp_x = -sin_a * GUN_BODY_HEIGHT / 2
+        perp_y = cos_a * GUN_BODY_HEIGHT / 2
+
+        body_points = [
+            (int(body_start_x - perp_x), int(body_start_y - perp_y)),
+            (int(body_start_x + perp_x), int(body_start_y + perp_y)),
+            (int(body_end_x + perp_x), int(body_end_y + perp_y)),
+            (int(body_end_x - perp_x), int(body_end_y - perp_y)),
+        ]
+        pygame.draw.polygon(surface, GUN_BODY_COLOR, body_points)
+
+        top_mid_x = (body_start_x + body_end_x) / 2 - perp_x * 0.6
+        top_mid_y = (body_start_y + body_end_y) / 2 - perp_y * 0.6
+        hl_start_x = body_start_x + cos_a * 2 - perp_x * 0.6
+        hl_start_y = body_start_y + sin_a * 2 - perp_y * 0.6
+        hl_end_x = body_end_x - cos_a * 3 - perp_x * 0.6
+        hl_end_y = body_end_y - sin_a * 3 - perp_y * 0.6
+        pygame.draw.line(surface, GUN_BODY_HIGHLIGHT,
+                         (int(hl_start_x), int(hl_start_y)),
+                         (int(hl_end_x), int(hl_end_y)), 2)
+
+        barrel_start_x = body_end_x
+        barrel_start_y = body_end_y
+        barrel_end_x = body_end_x + cos_a * GUN_BARREL_LENGTH
+        barrel_end_y = body_end_y + sin_a * GUN_BARREL_LENGTH
+
+        barrel_perp_x = -sin_a * 2
+        barrel_perp_y = cos_a * 2
+        barrel_points = [
+            (int(barrel_start_x - barrel_perp_x), int(barrel_start_y - barrel_perp_y)),
+            (int(barrel_start_x + barrel_perp_x), int(barrel_start_y + barrel_perp_y)),
+            (int(barrel_end_x + barrel_perp_x), int(barrel_end_y + barrel_perp_y)),
+            (int(barrel_end_x - barrel_perp_x), int(barrel_end_y - barrel_perp_y)),
+        ]
+        pygame.draw.polygon(surface, GUN_BARREL_COLOR, barrel_points)
+
+        grip_top_x = body_start_x + cos_a * 5
+        grip_top_y = body_start_y + sin_a * 5
+        grip_bottom_x = grip_top_x + perp_x * 2.5
+        grip_bottom_y = grip_top_y + perp_y * 2.5
+
+        grip_left_x = grip_top_x - cos_a * 2
+        grip_left_y = grip_top_y - sin_a * 2
+        grip_right_x = grip_top_x + cos_a * 1
+        grip_right_y = grip_top_y + sin_a * 1
+        grip_bl_x = grip_bottom_x - cos_a * 2
+        grip_bl_y = grip_bottom_y - sin_a * 2
+        grip_br_x = grip_bottom_x + cos_a * 1
+        grip_br_y = grip_bottom_y + sin_a * 1
+
+        grip_points = [
+            (int(grip_left_x), int(grip_left_y)),
+            (int(grip_right_x), int(grip_right_y)),
+            (int(grip_br_x), int(grip_br_y)),
+            (int(grip_bl_x), int(grip_bl_y)),
+        ]
+        pygame.draw.polygon(surface, GUN_GRIP_COLOR, grip_points)
+
+        for i in range(3):
+            wrap_t = (i + 1) / 4
+            wx = grip_top_x + (grip_bottom_x - grip_top_x) * wrap_t
+            wy = grip_top_y + (grip_bottom_y - grip_top_y) * wrap_t
+            pygame.draw.line(surface, GUN_GRIP_WRAP,
+                             (int(wx - cos_a), int(wy - sin_a)),
+                             (int(wx + cos_a), int(wy + sin_a)), 1)
+
+    def _draw_melee_effects(self, surface, camera_x, body_rect):
+        progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
+        pcx = self.x + self.width / 2 - camera_x
+        pcy = self.y + self.height / 2
+        direction = 1 if self.facing_right else -1
+        base_angle = 0 if self.facing_right else 180
+
+        start_deg = base_angle - MELEE_ARC_HALF * direction
+        end_deg = base_angle + MELEE_ARC_HALF * direction
+        current_deg = start_deg + (end_deg - start_deg) * progress
+
+        glow_radius = MELEE_SLASH_GLOW_RADIUS
+        glow_surf = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
+        glow_alpha = int(100 * (1 - abs(progress - 0.5) * 2))
+        pygame.draw.circle(glow_surf, (*KNIFE_SWING_GLOW_COLOR, glow_alpha),
+                           (glow_radius, glow_radius), glow_radius)
+
+        cur_rad = math.radians(current_deg)
+        glow_x = pcx + math.cos(cur_rad) * MELEE_RANGE - glow_radius
+        glow_y = pcy + math.sin(cur_rad) * MELEE_RANGE - glow_radius
+        surface.blit(glow_surf, (int(glow_x), int(glow_y)))
+
+        for i in range(MELEE_SLASH_TRAIL_COUNT):
+            trail_t = i / MELEE_SLASH_TRAIL_COUNT
+            trail_deg = start_deg + (current_deg - start_deg) * trail_t
+            trail_rad = math.radians(trail_deg)
+            trail_len = MELEE_RANGE * (0.3 + 0.7 * (1 - trail_t))
+            trail_end_x = pcx + math.cos(trail_rad) * trail_len
+            trail_end_y = pcy + math.sin(trail_rad) * trail_len
+            trail_alpha = int(180 * (1 - trail_t) * (1 - abs(progress - 0.5) * 2))
+            if trail_alpha > 10:
+                pygame.draw.line(surface, KNIFE_SLASH_TRAIL_COLOR,
+                                 (int(pcx), int(pcy)),
+                                 (int(trail_end_x), int(trail_end_y)),
+                                 max(1, int(4 * (1 - trail_t))))
+
+        arc_steps = 16
+        arc_span = MELEE_ARC_HALF * 2
+        arc_start = -MELEE_ARC_HALF
+        swing_surf = pygame.Surface((MELEE_RANGE * 2 + 20, MELEE_RANGE * 2 + 20), pygame.SRCALPHA)
+        scx = MELEE_RANGE + 10
+        scy = MELEE_RANGE + 10
+        for i in range(arc_steps):
+            t = i / arc_steps
+            a_deg = arc_start + t * arc_span
+            a_rad = math.radians(a_deg * direction + base_angle)
+            tip_x = scx + math.cos(a_rad) * MELEE_RANGE
+            tip_y = scy + math.sin(a_rad) * MELEE_RANGE
+            alpha = int(80 + 120 * (1 - abs(t - progress)) * (1 - abs(progress - 0.5)))
+            if alpha > 20:
+                pygame.draw.line(swing_surf, (*MELEE_COLOR, min(255, alpha)),
                                  (int(scx), int(scy)),
                                  (int(tip_x), int(tip_y)), 3)
 
-            cur_rad = math.radians(current_deg)
-            cur_tip_x = pcx + math.cos(cur_rad) * MELEE_RANGE
-            cur_tip_y = pcy + math.sin(cur_rad) * MELEE_RANGE
-            pygame.draw.line(surface, MELEE_COLOR,
-                             (int(pcx), int(pcy)),
-                             (int(cur_tip_x), int(cur_tip_y)), 4)
-            pygame.draw.circle(surface, MELEE_COLOR_TIP,
-                               (int(cur_tip_x), int(cur_tip_y)), 5)
+        surface.blit(swing_surf,
+                     (int(pcx - scx), int(pcy - scy)))
 
-        if self.reloading:
-            reload_progress = 1.0 - self.reload_timer / RANGED_RELOAD_FRAMES
-            rcx = self.x + self.width / 2 - camera_x
-            rcy = self.y - 12
-            arc_radius = 8
-            start_angle = -math.pi / 2
-            end_angle = start_angle + 2 * math.pi * reload_progress
-            if reload_progress > 0.01:
-                rect = pygame.Rect(rcx - arc_radius, rcy - arc_radius,
-                                   arc_radius * 2, arc_radius * 2)
-                pygame.draw.arc(surface, RANGED_COLOR, rect, start_angle, end_angle, 2)
+        cur_tip_x = pcx + math.cos(cur_rad) * MELEE_RANGE
+        cur_tip_y = pcy + math.sin(cur_rad) * MELEE_RANGE
+        pygame.draw.line(surface, MELEE_COLOR,
+                         (int(pcx), int(pcy)),
+                         (int(cur_tip_x), int(cur_tip_y)), 4)
+        pygame.draw.circle(surface, MELEE_COLOR_TIP,
+                           (int(cur_tip_x), int(cur_tip_y)), 5)
+
+        if progress > 0.4 and progress < 0.7:
+            impact_alpha = int(200 * (1 - abs(progress - 0.55) / 0.15))
+            impact_surf = pygame.Surface((MELEE_IMPACT_RING_RADIUS * 2, MELEE_IMPACT_RING_RADIUS * 2), pygame.SRCALPHA)
+            ring_r = int(MELEE_IMPACT_RING_RADIUS * (0.5 + progress))
+            pygame.draw.circle(impact_surf, (*KNIFE_IMPACT_FLASH_COLOR, min(255, impact_alpha)),
+                               (MELEE_IMPACT_RING_RADIUS, MELEE_IMPACT_RING_RADIUS),
+                               ring_r, 3)
+            surface.blit(impact_surf,
+                         (int(cur_tip_x - MELEE_IMPACT_RING_RADIUS),
+                          int(cur_tip_y - MELEE_IMPACT_RING_RADIUS)))
+
+    def _draw_muzzle_flash(self, surface, camera_x, body_rect, direction):
+        gun_angle = -0.15 if self.facing_right else math.pi + 0.15
+        cos_a = math.cos(gun_angle)
+        sin_a = math.sin(gun_angle)
+
+        hand_x = body_rect.centerx + direction * (body_rect.width / 2 + 2)
+        hand_y = body_rect.y + body_rect.height * 0.5
+
+        recoil_offset = 0
+        if self.ranged_shot_timer > 0:
+            recoil_t = self.ranged_shot_timer / GUN_RECOIL_FRAMES
+            recoil_offset = GUN_RECOIL_DISTANCE * recoil_t * direction
+
+        muzzle_x = hand_x + recoil_offset + cos_a * (GUN_BODY_LENGTH + GUN_BARREL_LENGTH)
+        muzzle_y = hand_y + sin_a * (GUN_BODY_LENGTH + GUN_BARREL_LENGTH)
+
+        flash_t = self.muzzle_flash_timer / MUZZLE_FLASH_DURATION
+        flash_size = int(MUZZLE_FLASH_SIZE * flash_t)
+
+        if flash_size > 0:
+            flash_surf = pygame.Surface((flash_size * 2, flash_size * 2), pygame.SRCALPHA)
+            pygame.draw.circle(flash_surf, (*MUZZLE_FLASH_OUTER, int(120 * flash_t)),
+                               (flash_size, flash_size), flash_size)
+            inner_size = max(1, int(flash_size * 0.6))
+            pygame.draw.circle(flash_surf, (*MUZZLE_FLASH_COLOR, int(200 * flash_t)),
+                               (flash_size, flash_size), inner_size)
+            pygame.draw.circle(flash_surf, (255, 255, 255, int(255 * flash_t)),
+                               (flash_size, flash_size), max(1, int(flash_size * 0.25)))
+
+            for i in range(4):
+                spike_angle = gun_angle + i * math.pi / 2 + math.pi / 4
+                spike_len = flash_size * (0.8 + 0.4 * math.sin(flash_t * 10 + i))
+                spike_end_x = flash_size + math.cos(spike_angle) * spike_len
+                spike_end_y = flash_size + math.sin(spike_angle) * spike_len
+                pygame.draw.line(flash_surf, (*MUZZLE_FLASH_COLOR, int(180 * flash_t)),
+                                 (flash_size, flash_size),
+                                 (int(spike_end_x), int(spike_end_y)), 2)
+
+            surface.blit(flash_surf,
+                         (int(muzzle_x - flash_size), int(muzzle_y - flash_size)))
 
 
 class Portal:
