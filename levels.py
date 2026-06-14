@@ -31,6 +31,8 @@ class LevelConfig:
         coin_positions: 金币坐标列表 [(x, y), ...]
         ladder_specs: 梯子规格列表 [(x, y, h), ...]
         portal_specs: 传送门规格列表 [(x, y, target_level, tx, ty, required_coins), ...]
+        patrol_enemy_specs: 巡逻怪规格列表 [(path_points, loop_mode), ...]
+        chase_enemy_specs: 追踪怪规格列表 [(x, y), ...]
         sky_top: 天空顶部渐变颜色
         sky_bottom: 天空底部渐变颜色
         mountain_color: 山脉主体颜色
@@ -65,6 +67,8 @@ class LevelConfig:
         coin_positions,
         ladder_specs,
         portal_specs,
+        patrol_enemy_specs=None,
+        chase_enemy_specs=None,
         sky_top=(100, 180, 255),
         sky_bottom=(200, 230, 255),
         mountain_color=(70, 120, 80),
@@ -96,6 +100,8 @@ class LevelConfig:
         self.coin_positions = coin_positions
         self.ladder_specs = ladder_specs
         self.portal_specs = portal_specs
+        self.patrol_enemy_specs = patrol_enemy_specs if patrol_enemy_specs is not None else []
+        self.chase_enemy_specs = chase_enemy_specs if chase_enemy_specs is not None else []
         self.sky_top = sky_top
         self.sky_bottom = sky_bottom
         self.mountain_color = mountain_color
@@ -176,6 +182,24 @@ def build_level_0():
         (2200, SCREEN_HEIGHT - 40 - 90, -1, 2600, 130, 0),
         (2900, 130, 1, 100, 400, 0),
     ]
+    patrol_enemy_specs = [
+        (
+            [(520, SCREEN_HEIGHT - 40 - 32), (780, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+        (
+            [(1280, SCREEN_HEIGHT - 40 - 32), (1620, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+        (
+            [(2150, SCREEN_HEIGHT - 40 - 32), (2450, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+    ]
+    chase_enemy_specs = [
+        (1000, 200),
+        (2300, 180),
+    ]
     return LevelConfig(
         level_id=0,
         name="翠绿草原",
@@ -187,6 +211,8 @@ def build_level_0():
         coin_positions=coin_positions,
         ladder_specs=ladder_specs,
         portal_specs=portal_specs,
+        patrol_enemy_specs=patrol_enemy_specs,
+        chase_enemy_specs=chase_enemy_specs,
         sky_top=(100, 180, 255),
         sky_bottom=(200, 230, 255),
         mountain_color=(70, 120, 80),
@@ -262,6 +288,29 @@ def build_level_1():
         (850, SCREEN_HEIGHT - 40 - 90, -1, 1640, 142, 0),
         (2900, 130, 2, 100, 400, 5),
     ]
+    patrol_enemy_specs = [
+        (
+            [(470, SCREEN_HEIGHT - 40 - 32), (680, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+        (
+            [(1120, SCREEN_HEIGHT - 40 - 32), (1380, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+        (
+            [(1880, SCREEN_HEIGHT - 40 - 32), (2400, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+        (
+            [(2600, SCREEN_HEIGHT - 40 - 32), (2950, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+    ]
+    chase_enemy_specs = [
+        (900, 250),
+        (1500, 150),
+        (2500, 200),
+    ]
     return LevelConfig(
         level_id=1,
         name="日落沙丘",
@@ -273,6 +322,8 @@ def build_level_1():
         coin_positions=coin_positions,
         ladder_specs=ladder_specs,
         portal_specs=portal_specs,
+        patrol_enemy_specs=patrol_enemy_specs,
+        chase_enemy_specs=chase_enemy_specs,
         sky_top=(255, 140, 60),
         sky_bottom=(255, 200, 140),
         mountain_color=(200, 130, 70),
@@ -354,6 +405,30 @@ def build_level_2():
         (1920, SCREEN_HEIGHT - 40 - 90, -1, 2400, 80, 0),
         (2900, 0, 0, 100, 400, 10),
     ]
+    patrol_enemy_specs = [
+        (
+            [(420, SCREEN_HEIGHT - 40 - 32), (680, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+        (
+            [(1000, SCREEN_HEIGHT - 40 - 32), (1480, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+        (
+            [(1600, SCREEN_HEIGHT - 40 - 32), (2100, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+        (
+            [(2250, SCREEN_HEIGHT - 40 - 32), (2950, SCREEN_HEIGHT - 40 - 32)],
+            False,
+        ),
+    ]
+    chase_enemy_specs = [
+        (700, 280),
+        (1300, 180),
+        (2000, 150),
+        (2700, 200),
+    ]
     return LevelConfig(
         level_id=2,
         name="星空之巅",
@@ -365,6 +440,8 @@ def build_level_2():
         coin_positions=coin_positions,
         ladder_specs=ladder_specs,
         portal_specs=portal_specs,
+        patrol_enemy_specs=patrol_enemy_specs,
+        chase_enemy_specs=chase_enemy_specs,
         sky_top=(10, 10, 40),
         sky_bottom=(30, 20, 80),
         mountain_color=(30, 20, 60),

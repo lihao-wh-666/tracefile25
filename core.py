@@ -46,7 +46,7 @@ from config import (
     SHOW_VOLUME_PANEL_KEY,
 )
 
-from entities import Particle, Coin, Platform, Player, Ladder, Portal
+from entities import Particle, Coin, Platform, Player, Ladder, Portal, PatrolEnemy, ChaseEnemy
 from levels import get_level_config, LEVEL_BUILDERS
 from audio import AudioManager
 from ui import VolumePanel
@@ -68,6 +68,8 @@ class Game:
         coins: 所有金币列表
         ladders: 所有梯子列表
         portals: 所有传送门列表
+        patrol_enemies: 所有巡逻怪列表
+        chase_enemies: 所有追踪怪列表
         player: 玩家对象
         font: 小字体（HUD）
         big_font: 大字体（标题等）
@@ -98,6 +100,8 @@ class Game:
         self.coins = []
         self.ladders = []
         self.portals = []
+        self.patrol_enemies = []
+        self.chase_enemies = []
 
         self.current_level = 0
         self.game_state = GameState.LOADING
@@ -279,6 +283,8 @@ class Game:
         self.coins = []
         self.ladders = []
         self.portals = []
+        self.patrol_enemies = []
+        self.chase_enemies = []
 
         for x, y, w, h in level_config.ground_specs:
             self.platforms.append(Platform(x, y, w, h, is_ground=True))
@@ -299,6 +305,12 @@ class Game:
                 x, y, target_level, tx, ty = spec
                 required_coins = 0
             self.portals.append(Portal(x, y, target_level, tx, ty, required_coins))
+
+        for path_points, loop_mode in level_config.patrol_enemy_specs:
+            self.patrol_enemies.append(PatrolEnemy(path_points, loop_mode))
+
+        for x, y in level_config.chase_enemy_specs:
+            self.chase_enemies.append(ChaseEnemy(x, y))
 
     def _load_level(self, level_id, spawn_x, spawn_y, immediate=False):
         """
@@ -571,6 +583,41 @@ class Game:
                 )
                 break
 
+    def _check_enemy_collisions(self):
+        """检测玩家与敌人的碰撞。"""
+        player_rect = self.player.get_rect()
+
+        for enemy in self.patrol_enemies:
+            if player_rect.colliderect(enemy.get_rect()):
+                self._player_hit_by_enemy()
+                return
+
+        for enemy in self.chase_enemies:
+            if player_rect.colliderect(enemy.get_rect()):
+                self._player_hit_by_enemy()
+                return
+
+    def _player_hit_by_enemy(self):
+        """玩家被敌人击中时的处理。"""
+        self.player.died = True
+        if self.player.on_death:
+            self.player.on_death()
+        self.player.x = self.player.start_x
+        self.player.y = 0
+        self.player.vx = 0
+        self.player.vy = 0
+        self.player.climbing = False
+        self.player.current_ladder = None
+        self.player.jump_count = 0
+
+        final_score = self.score
+        self.score = 0
+        for coin in self.coins:
+            coin.collected = False
+            coin.collect_anim = 0
+        self.player.died = False
+        self.menu_manager.trigger_game_over(final_score)
+
     def _draw_hud(self):
         """绘制抬头显示（HUD）。"""
         SHADOW_OFFSET = 3
@@ -747,6 +794,12 @@ class Game:
                 size=2,
             )
 
+        for enemy in self.patrol_enemies:
+            enemy.update(self.platforms, self.player)
+
+        for enemy in self.chase_enemies:
+            enemy.update(self.player)
+
         self._check_coins()
 
         for coin in self.coins:
@@ -756,6 +809,8 @@ class Game:
 
         for portal in self.portals:
             portal.update(self.score)
+
+        self._check_enemy_collisions()
 
         self.particles = [p for p in self.particles if p.life > 0]
         for p in self.particles:
@@ -804,6 +859,12 @@ class Game:
 
         for portal in self.portals:
             portal.draw(self.screen, self.camera_x, self.tick)
+
+        for enemy in self.patrol_enemies:
+            enemy.draw(self.screen, self.camera_x)
+
+        for enemy in self.chase_enemies:
+            enemy.draw(self.screen, self.camera_x)
 
         for p in self.particles:
             p.draw(self.screen, self.camera_x)
