@@ -1076,14 +1076,13 @@ class PatrolEnemy:
 
         target_x, target_y = self.path_points[self.current_target]
         dx = target_x - self.x
-        dy = target_y - self.y
-        dist_to_target = math.sqrt(dx * dx + dy * dy)
+        dist_to_target = abs(dx)
 
         if dist_to_target < speed:
             self.x = target_x
             self._advance_target()
         else:
-            self.vx = (dx / dist_to_target) * speed
+            self.vx = (1 if dx > 0 else -1) * speed
             self.x += self.vx
 
         if self.vx > 0.1:
@@ -1096,7 +1095,8 @@ class PatrolEnemy:
             self.vy = MAX_FALL_SPEED
         self.y += self.vy
 
-        self._resolve_collisions(platforms)
+        self._resolve_horizontal(platforms)
+        self._resolve_vertical(platforms)
 
     def _advance_target(self):
         """移动到下一个路径点。"""
@@ -1110,28 +1110,34 @@ class PatrolEnemy:
             else:
                 self.current_target = next_idx
 
-    def _resolve_collisions(self, platforms):
-        """处理与平台的碰撞。"""
+    def _resolve_horizontal(self, platforms):
+        """水平方向碰撞解析。"""
         rect = self.get_rect()
+        for plat in platforms:
+            if rect.colliderect(plat.rect):
+                if self.vx > 0:
+                    self.x = plat.rect.left - self.width
+                elif self.vx < 0:
+                    self.x = plat.rect.right
+                self.vx = 0
+                self._advance_target()
+                rect = self.get_rect()
+
+    def _resolve_vertical(self, platforms):
+        """垂直方向碰撞解析。"""
+        rect = self.get_rect()
+        was_on_ground = self.on_ground
         self.on_ground = False
 
         for plat in platforms:
             if rect.colliderect(plat.rect):
-                if self.vy > 0:
+                if self.vy >= 0:
                     self.y = plat.rect.top - self.height
                     self.vy = 0
                     self.on_ground = True
                 elif self.vy < 0:
                     self.y = plat.rect.bottom
                     self.vy = 0
-
-                if self.vx > 0:
-                    self.x = plat.rect.left - self.width
-                    self._advance_target()
-                elif self.vx < 0:
-                    self.x = plat.rect.right
-                    self._advance_target()
-
                 rect = self.get_rect()
 
     def draw(self, surface, camera_x):
