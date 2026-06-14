@@ -321,6 +321,58 @@ def _make_sfx_menu_click():
     )
 
 
+def _make_sfx_melee_swing():
+    """生成近战挥砍音效：短促的风声。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["G4"], 0.03), (nf["C5"], 0.04), (nf["E5"], 0.05),
+    ]
+    return _generate_melody(notes, tempo=240, volume=0.4, waveform="sawtooth")
+
+
+def _make_sfx_ranged_shot():
+    """生成远程射击音效：短促的爆裂声。"""
+    return _generate_tone(
+        frequency=440, duration=0.08, volume=0.45,
+        waveform="square", decay=30.0
+    )
+
+
+def _make_sfx_hit_impact():
+    """生成命中反馈音效：沉闷的打击声。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["C4"], 0.06), (nf["E4"], 0.08),
+    ]
+    return _generate_melody(notes, tempo=200, volume=0.5, waveform="square")
+
+
+def _make_sfx_enemy_hit():
+    """生成敌人受击音效。"""
+    return _generate_tone(
+        frequency=200, duration=0.1, volume=0.4,
+        waveform="sawtooth", decay=20.0
+    )
+
+
+def _make_sfx_reload():
+    """生成换弹音效。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["E4"], 0.06), (nf["G4"], 0.08), (nf["C5"], 0.1),
+    ]
+    return _generate_melody(notes, tempo=160, volume=0.35, waveform="triangle")
+
+
+def _make_sfx_ammo_pickup():
+    """生成弹药拾取音效。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["G5"], 0.05), (nf["C6"], 0.08),
+    ]
+    return _generate_melody(notes, tempo=220, volume=0.4, waveform="square")
+
+
 def _make_sfx_level_complete():
     """生成关卡完成音效：胜利旋律。"""
     nf = NOTE_FREQ
@@ -351,6 +403,12 @@ class AudioManager:
     SFX_DEATH = "death"
     SFX_MENU_CLICK = "menu_click"
     SFX_LEVEL_COMPLETE = "level_complete"
+    SFX_MELEE_SWING = "melee_swing"
+    SFX_RANGED_SHOT = "ranged_shot"
+    SFX_HIT_IMPACT = "hit_impact"
+    SFX_ENEMY_HIT = "enemy_hit"
+    SFX_RELOAD = "reload"
+    SFX_AMMO_PICKUP = "ammo_pickup"
 
     def __init__(self):
         self.enabled = False
@@ -416,6 +474,12 @@ class AudioManager:
             self.SFX_DEATH: _make_sfx_death,
             self.SFX_MENU_CLICK: _make_sfx_menu_click,
             self.SFX_LEVEL_COMPLETE: _make_sfx_level_complete,
+            self.SFX_MELEE_SWING: _make_sfx_melee_swing,
+            self.SFX_RANGED_SHOT: _make_sfx_ranged_shot,
+            self.SFX_HIT_IMPACT: _make_sfx_hit_impact,
+            self.SFX_ENEMY_HIT: _make_sfx_enemy_hit,
+            self.SFX_RELOAD: _make_sfx_reload,
+            self.SFX_AMMO_PICKUP: _make_sfx_ammo_pickup,
         }
 
         for name, gen in sfx_generators.items():

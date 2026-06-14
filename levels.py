@@ -69,6 +69,7 @@ class LevelConfig:
         portal_specs,
         patrol_enemy_specs=None,
         chase_enemy_specs=None,
+        ammo_pickup_specs=None,
         sky_top=(100, 180, 255),
         sky_bottom=(200, 230, 255),
         mountain_color=(70, 120, 80),
@@ -102,6 +103,7 @@ class LevelConfig:
         self.portal_specs = portal_specs
         self.patrol_enemy_specs = patrol_enemy_specs if patrol_enemy_specs is not None else []
         self.chase_enemy_specs = chase_enemy_specs if chase_enemy_specs is not None else []
+        self.ammo_pickup_specs = ammo_pickup_specs if ammo_pickup_specs is not None else []
         self.sky_top = sky_top
         self.sky_bottom = sky_bottom
         self.mountain_color = mountain_color
@@ -200,6 +202,9 @@ def build_level_0():
         (1000, 200),
         (2300, 180),
     ]
+    ammo_pickup_specs = [
+        (700, 400), (1400, 260), (2100, 320), (2700, 170),
+    ]
     return LevelConfig(
         level_id=0,
         name="翠绿草原",
@@ -213,6 +218,7 @@ def build_level_0():
         portal_specs=portal_specs,
         patrol_enemy_specs=patrol_enemy_specs,
         chase_enemy_specs=chase_enemy_specs,
+        ammo_pickup_specs=ammo_pickup_specs,
         sky_top=(100, 180, 255),
         sky_bottom=(200, 230, 255),
         mountain_color=(70, 120, 80),
@@ -311,6 +317,9 @@ def build_level_1():
         (1500, 150),
         (2500, 200),
     ]
+    ammo_pickup_specs = [
+        (600, 350), (1200, 290), (1800, 260), (2500, 170),
+    ]
     return LevelConfig(
         level_id=1,
         name="日落沙丘",
@@ -324,6 +333,7 @@ def build_level_1():
         portal_specs=portal_specs,
         patrol_enemy_specs=patrol_enemy_specs,
         chase_enemy_specs=chase_enemy_specs,
+        ammo_pickup_specs=ammo_pickup_specs,
         sky_top=(255, 140, 60),
         sky_bottom=(255, 200, 140),
         mountain_color=(200, 130, 70),
@@ -429,6 +439,9 @@ def build_level_2():
         (2000, 150),
         (2700, 200),
     ]
+    ammo_pickup_specs = [
+        (500, 250), (1000, 270), (1600, 250), (2200, 160), (2800, 130),
+    ]
     return LevelConfig(
         level_id=2,
         name="星空之巅",
@@ -442,6 +455,7 @@ def build_level_2():
         portal_specs=portal_specs,
         patrol_enemy_specs=patrol_enemy_specs,
         chase_enemy_specs=chase_enemy_specs,
+        ammo_pickup_specs=ammo_pickup_specs,
         sky_top=(10, 10, 40),
         sky_bottom=(30, 20, 80),
         mountain_color=(30, 20, 60),

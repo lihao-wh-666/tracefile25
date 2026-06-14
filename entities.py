@@ -43,6 +43,15 @@ from config import (
     CHASE_ENEMY_GIVE_UP_RANGE,
     CHASE_ENEMY_COLOR, CHASE_ENEMY_DARK, CHASE_ENEMY_LIGHT,
     CHASE_ENEMY_EYE, CHASE_ENEMY_PUPIL, CHASE_ENEMY_GLOW_COLOR,
+    MELEE_COOLDOWN_FRAMES, MELEE_RANGE, MELEE_ARC_HALF, MELEE_DAMAGE,
+    MELEE_DURATION_FRAMES, MELEE_HIT_FRAME, MELEE_COLOR, MELEE_COLOR_TIP,
+    RANGED_COOLDOWN_FRAMES, RANGED_AMMO_MAX, RANGED_AMMO_INITIAL,
+    RANGED_PROJECTILE_SPEED, RANGED_PROJECTILE_SIZE, RANGED_DAMAGE,
+    RANGED_GRAVITY, RANGED_MAX_DISTANCE, RANGED_RELOAD_FRAMES,
+    RANGED_COLOR, RANGED_COLOR_TRAIL,
+    RANGED_AMMO_PICKUP_AMOUNT, AMMO_PICKUP_COLOR, AMMO_PICKUP_DARK,
+    ENEMY_KNOCKBACK_SPEED, ENEMY_KNOCKBACK_DURATION,
+    PATROL_ENEMY_HP, CHASE_ENEMY_HP,
 )
 
 
@@ -387,9 +396,100 @@ class Player:
         self.on_land = None
         self.on_death = None
 
+        self.melee_cooldown = 0
+        self.melee_timer = 0
+        self.melee_active = False
+        self.melee_hit_done = False
+        self.melee_angle = 0.0
+
+        self.ranged_cooldown = 0
+        self.ammo = RANGED_AMMO_INITIAL
+        self.reloading = False
+        self.reload_timer = 0
+
+        self.on_melee_swing = None
+        self.on_ranged_shot = None
+        self.on_reload = None
+        self.on_ammo_pickup = None
+
     def get_rect(self):
         """返回玩家碰撞矩形。"""
         return pygame.Rect(self.x, self.y, self.width, self.height)
+
+    def start_melee(self):
+        if self.melee_cooldown > 0 or self.melee_active:
+            return False
+        self.melee_active = True
+        self.melee_timer = MELEE_DURATION_FRAMES
+        self.melee_cooldown = MELEE_COOLDOWN_FRAMES
+        self.melee_hit_done = False
+        self.melee_angle = -MELEE_ARC_HALF
+        if self.on_melee_swing:
+            self.on_melee_swing()
+        return True
+
+    def start_ranged_shot(self):
+        if self.ranged_cooldown > 0 or self.reloading:
+            return None
+        if self.ammo <= 0:
+            return None
+        self.ammo -= 1
+        self.ranged_cooldown = RANGED_COOLDOWN_FRAMES
+
+        cx = self.x + self.width / 2
+        cy = self.y + self.height / 2
+        direction = 1 if self.facing_right else -1
+        vx = RANGED_PROJECTILE_SPEED * direction
+        vy = -1.0
+
+        if self.on_ranged_shot:
+            self.on_ranged_shot()
+
+        return Bullet(cx + direction * 15, cy, vx, vy)
+
+    def start_reload(self):
+        if self.reloading or self.ammo >= RANGED_AMMO_MAX:
+            return False
+        self.reloading = True
+        self.reload_timer = RANGED_RELOAD_FRAMES
+        if self.on_reload:
+            self.on_reload()
+        return True
+
+    def get_melee_hitbox(self):
+        if not self.melee_active:
+            return None
+        progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
+        current_angle = -MELEE_ARC_HALF + progress * MELEE_ARC_HALF * 2
+        cx = self.x + self.width / 2
+        cy = self.y + self.height / 2
+        direction = 1 if self.facing_right else -1
+        base_angle = 0 if self.facing_right else math.pi
+        rad = math.radians(current_angle) * direction + base_angle
+        hit_x = cx + math.cos(rad) * MELEE_RANGE
+        hit_y = cy + math.sin(rad) * MELEE_RANGE
+        return pygame.Rect(hit_x - 12, hit_y - 12, 24, 24)
+
+    def update_combat(self):
+        if self.melee_cooldown > 0:
+            self.melee_cooldown -= 1
+
+        if self.melee_active:
+            self.melee_timer -= 1
+            progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
+            self.melee_angle = -MELEE_ARC_HALF + progress * MELEE_ARC_HALF * 2
+            if self.melee_timer <= 0:
+                self.melee_active = False
+                self.melee_hit_done = False
+
+        if self.ranged_cooldown > 0:
+            self.ranged_cooldown -= 1
+
+        if self.reloading:
+            self.reload_timer -= 1
+            if self.reload_timer <= 0:
+                self.ammo = RANGED_AMMO_MAX
+                self.reloading = False
 
     def update(self, keys, platforms, ladders=None):
         """
@@ -416,6 +516,8 @@ class Player:
         """
         if ladders is None:
             ladders = []
+
+        self.update_combat()
 
         if self.multi_jump_cooldown > 0:
             self.multi_jump_cooldown -= 1
@@ -834,6 +936,56 @@ class Player:
                 surface, PLAYER_PUPIL, (int(ex2 + look_offset), int(eye_y)), 2
             )
 
+        if self.melee_active:
+            progress = 1.0 - self.melee_timer / MELEE_DURATION_FRAMES
+            pcx = self.x + self.width / 2 - camera_x
+            pcy = self.y + self.height / 2
+            direction = 1 if self.facing_right else -1
+            base_angle = 0 if self.facing_right else 180
+
+            start_deg = base_angle - MELEE_ARC_HALF * direction
+            end_deg = base_angle + MELEE_ARC_HALF * direction
+            current_deg = start_deg + (end_deg - start_deg) * progress
+
+            swing_surf = pygame.Surface((MELEE_RANGE * 2 + 20, MELEE_RANGE * 2 + 20), pygame.SRCALPHA)
+            scx = MELEE_RANGE + 10
+            scy = MELEE_RANGE + 10
+
+            arc_steps = 12
+            arc_span = MELEE_ARC_HALF * 2
+            arc_start = -MELEE_ARC_HALF
+            for i in range(arc_steps):
+                t = i / arc_steps
+                a_deg = arc_start + t * arc_span
+                a_rad = math.radians(a_deg * direction + base_angle)
+                tip_x = scx + math.cos(a_rad) * MELEE_RANGE
+                tip_y = scy + math.sin(a_rad) * MELEE_RANGE
+                alpha = int(60 + 140 * t * (1 - abs(t - 0.5) * 2))
+                pygame.draw.line(swing_surf, (*MELEE_COLOR, alpha),
+                                 (int(scx), int(scy)),
+                                 (int(tip_x), int(tip_y)), 3)
+
+            cur_rad = math.radians(current_deg)
+            cur_tip_x = pcx + math.cos(cur_rad) * MELEE_RANGE
+            cur_tip_y = pcy + math.sin(cur_rad) * MELEE_RANGE
+            pygame.draw.line(surface, MELEE_COLOR,
+                             (int(pcx), int(pcy)),
+                             (int(cur_tip_x), int(cur_tip_y)), 4)
+            pygame.draw.circle(surface, MELEE_COLOR_TIP,
+                               (int(cur_tip_x), int(cur_tip_y)), 5)
+
+        if self.reloading:
+            reload_progress = 1.0 - self.reload_timer / RANGED_RELOAD_FRAMES
+            rcx = self.x + self.width / 2 - camera_x
+            rcy = self.y - 12
+            arc_radius = 8
+            start_angle = -math.pi / 2
+            end_angle = start_angle + 2 * math.pi * reload_progress
+            if reload_progress > 0.01:
+                rect = pygame.Rect(rcx - arc_radius, rcy - arc_radius,
+                                   arc_radius * 2, arc_radius * 2)
+                pygame.draw.arc(surface, RANGED_COLOR, rect, start_angle, end_angle, 2)
+
 
 class Portal:
     """
@@ -1039,12 +1191,26 @@ class PatrolEnemy:
         self.anim_phase = 0.0
         self.alert_flash = 0
 
+        self.hp = PATROL_ENEMY_HP
+        self.max_hp = PATROL_ENEMY_HP
+        self.knockback_timer = 0
+        self.knockback_vx = 0
+        self.hit_flash = 0
+
     def get_rect(self):
         """返回碰撞检测矩形。"""
         return pygame.Rect(self.x, self.y, self.width, self.height)
 
+    def take_damage(self, damage, knockback_direction):
+        self.hp -= damage
+        self.knockback_timer = ENEMY_KNOCKBACK_DURATION
+        self.knockback_vx = knockback_direction * ENEMY_KNOCKBACK_SPEED
+        self.hit_flash = 6
+        if self.hp <= 0:
+            return True
+        return False
+
     def _distance_to_player(self, player):
-        """计算到玩家的距离。"""
         ex = self.x + self.width / 2
         ey = self.y + self.height / 2
         px = player.x + player.width / 2
@@ -1060,6 +1226,21 @@ class PatrolEnemy:
             player: 玩家对象
         """
         self.anim_phase += 0.15
+
+        if self.hit_flash > 0:
+            self.hit_flash -= 1
+
+        if self.knockback_timer > 0:
+            self.knockback_timer -= 1
+            self.x += self.knockback_vx
+            self.knockback_vx *= 0.85
+            self.vy += GRAVITY
+            if self.vy > MAX_FALL_SPEED:
+                self.vy = MAX_FALL_SPEED
+            self.y += self.vy
+            self._resolve_horizontal(platforms)
+            self._resolve_vertical(platforms)
+            return
 
         dist = self._distance_to_player(player)
         was_alert = self.alert
@@ -1162,6 +1343,11 @@ class PatrolEnemy:
             dark_color = (200, 160, 0)
             light_color = (255, 230, 100)
 
+        if self.hit_flash > 0 and self.hit_flash % 2 == 0:
+            body_color = (255, 255, 255)
+            dark_color = (200, 200, 200)
+            light_color = (255, 255, 255)
+
         bounce = math.sin(self.anim_phase) * 2 if self.on_ground else 0
         draw_y = sy + bounce
 
@@ -1223,6 +1409,16 @@ class PatrolEnemy:
                 (exclamation_x, exclamation_y + 4), 2
             )
 
+        if self.hp < self.max_hp:
+            hp_bar_w = self.width
+            hp_bar_h = 4
+            hp_x = sx
+            hp_y = draw_y - 8
+            pygame.draw.rect(surface, (80, 0, 0), (hp_x, hp_y, hp_bar_w, hp_bar_h))
+            fill_w = int(hp_bar_w * self.hp / self.max_hp)
+            if fill_w > 0:
+                pygame.draw.rect(surface, (255, 60, 60), (hp_x, hp_y, fill_w, hp_bar_h))
+
 
 class ChaseEnemy:
     """
@@ -1269,9 +1465,26 @@ class ChaseEnemy:
         self._float_offset = 0
         self._base_y = y
 
+        self.hp = CHASE_ENEMY_HP
+        self.max_hp = CHASE_ENEMY_HP
+        self.knockback_timer = 0
+        self.knockback_vx = 0
+        self.knockback_vy = 0
+        self.hit_flash = 0
+
     def get_rect(self):
         """返回碰撞检测矩形。"""
         return pygame.Rect(self.x, self.y, self.width, self.height)
+
+    def take_damage(self, damage, knockback_direction):
+        self.hp -= damage
+        self.knockback_timer = ENEMY_KNOCKBACK_DURATION
+        self.knockback_vx = knockback_direction * ENEMY_KNOCKBACK_SPEED
+        self.knockback_vy = -3
+        self.hit_flash = 6
+        if self.hp <= 0:
+            return True
+        return False
 
     def _distance_to_player(self, player):
         """计算到玩家的距离。"""
@@ -1291,7 +1504,22 @@ class ChaseEnemy:
         self.anim_phase += 0.1
         self.glow_phase += 0.08
 
+        if self.hit_flash > 0:
+            self.hit_flash -= 1
+
         self._float_offset = math.sin(self.anim_phase) * 4
+
+        if self.knockback_timer > 0:
+            self.knockback_timer -= 1
+            self.x += self.knockback_vx
+            self.y += self.knockback_vy
+            self.knockback_vx *= 0.85
+            self.knockback_vy *= 0.85
+            if self.x < 0:
+                self.x = 0
+            if self.x + self.width > LEVEL_WIDTH:
+                self.x = LEVEL_WIDTH - self.width
+            return
 
         dist = self._distance_to_player(player)
 
@@ -1369,6 +1597,11 @@ class ChaseEnemy:
 
         if self.chasing:
             body_color = tuple(min(255, c + 30) for c in CHASE_ENEMY_COLOR)
+
+        if self.hit_flash > 0 and self.hit_flash % 2 == 0:
+            body_color = (255, 255, 255)
+            dark_color = (200, 200, 200)
+            light_color = (255, 255, 255)
 
         points = []
         wave_count = 4
@@ -1452,3 +1685,150 @@ class ChaseEnemy:
             )
             tx = tail_x - i * 6 * tail_dir
             surface.blit(tail_surf, (tx - t_size, int(t_y) - t_size))
+
+        if self.hp < self.max_hp:
+            hp_bar_w = self.width
+            hp_bar_h = 4
+            hp_x = sx
+            hp_y = int(sy) - 8
+            pygame.draw.rect(surface, (80, 0, 0), (hp_x, hp_y, hp_bar_w, hp_bar_h))
+            fill_w = int(hp_bar_w * self.hp / self.max_hp)
+            if fill_w > 0:
+                pygame.draw.rect(surface, (255, 60, 255), (hp_x, hp_y, fill_w, hp_bar_h))
+
+
+class Bullet:
+    """
+    远程射击弹丸类，模拟弹道物理飞行。
+
+    属性:
+        x, y: 弹丸中心坐标
+        vx, vy: 弹丸速度向量
+        damage: 伤害值
+        distance_traveled: 已飞行距离
+        alive: 弹丸是否存活
+        trail: 弹道轨迹点列表 [(x, y), ...]
+    """
+
+    def __init__(self, x, y, vx, vy, damage=RANGED_DAMAGE):
+        self.x = x
+        self.y = y
+        self.vx = vx
+        self.vy = vy
+        self.damage = damage
+        self.distance_traveled = 0.0
+        self.alive = True
+        self.trail = []
+        self.size = RANGED_PROJECTILE_SIZE
+
+    def get_rect(self):
+        return pygame.Rect(
+            self.x - self.size,
+            self.y - self.size,
+            self.size * 2,
+            self.size * 2,
+        )
+
+    def update(self, platforms):
+        self.trail.append((self.x, self.y))
+        if len(self.trail) > 8:
+            self.trail.pop(0)
+
+        old_x = self.x
+        old_y = self.y
+
+        self.x += self.vx
+        self.vy += RANGED_GRAVITY
+        self.y += self.vy
+
+        dx = self.x - old_x
+        dy = self.y - old_y
+        self.distance_traveled += math.sqrt(dx * dx + dy * dy)
+
+        if self.distance_traveled > RANGED_MAX_DISTANCE:
+            self.alive = False
+            return
+
+        if self.x < -50 or self.x > LEVEL_WIDTH + 50:
+            self.alive = False
+            return
+        if self.y > SCREEN_HEIGHT + 50 or self.y < -200:
+            self.alive = False
+            return
+
+        bullet_rect = self.get_rect()
+        for plat in platforms:
+            if bullet_rect.colliderect(plat.rect):
+                self.alive = False
+                return
+
+    def draw(self, surface, camera_x):
+        if not self.alive:
+            return
+
+        for i, (tx, ty) in enumerate(self.trail):
+            alpha = (i + 1) / len(self.trail) if self.trail else 1.0
+            tsx = int(tx - camera_x)
+            tsy = int(ty)
+            trail_size = max(1, int(self.size * alpha * 0.6))
+            if 0 <= tsx <= SCREEN_WIDTH and 0 <= tsy <= SCREEN_HEIGHT:
+                pygame.draw.circle(surface, RANGED_COLOR_TRAIL, (tsx, tsy), trail_size)
+
+        sx = int(self.x - camera_x)
+        sy = int(self.y)
+
+        if 0 <= sx <= SCREEN_WIDTH and 0 <= sy <= SCREEN_HEIGHT:
+            glow_surf = pygame.Surface((self.size * 6, self.size * 6), pygame.SRCALPHA)
+            pygame.draw.circle(
+                glow_surf,
+                (*RANGED_COLOR, 80),
+                (self.size * 3, self.size * 3),
+                self.size * 3,
+            )
+            surface.blit(glow_surf, (sx - self.size * 3, sy - self.size * 3))
+            pygame.draw.circle(surface, RANGED_COLOR, (sx, sy), self.size)
+            pygame.draw.circle(surface, (255, 255, 255), (sx, sy), max(1, self.size - 2))
+
+
+class AmmoPickup:
+    """
+    弹药拾取物，玩家接触后恢复弹药。
+
+    属性:
+        x, y: 弹药拾取物中心坐标
+        collected: 是否已被拾取
+        bob_offset: 浮动动画相位偏移
+    """
+
+    def __init__(self, x, y, amount=RANGED_AMMO_PICKUP_AMOUNT):
+        self.x = x
+        self.y = y
+        self.radius = 8
+        self.amount = amount
+        self.collected = False
+        self.bob_offset = random.random() * math.pi * 2
+
+    def get_rect(self):
+        return pygame.Rect(
+            self.x - self.radius,
+            self.y - self.radius,
+            self.radius * 2,
+            self.radius * 2,
+        )
+
+    def draw(self, surface, camera_x, tick):
+        if self.collected:
+            return
+
+        bob_y = math.sin(tick * 0.06 + self.bob_offset) * 4
+        sx = int(self.x - camera_x)
+        sy = int(self.y + bob_y)
+
+        if sx + self.radius < -20 or sx - self.radius > SCREEN_WIDTH + 20:
+            return
+
+        pygame.draw.circle(surface, AMMO_PICKUP_DARK, (sx + 1, sy + 1), self.radius)
+        pygame.draw.circle(surface, AMMO_PICKUP_COLOR, (sx, sy), self.radius)
+
+        pygame.draw.rect(surface, AMMO_PICKUP_DARK, (sx - 2, sy - 4, 4, 8))
+        pygame.draw.rect(surface, AMMO_PICKUP_DARK, (sx - 4, sy - 2, 8, 4))

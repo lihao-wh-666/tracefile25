@@ -44,9 +44,14 @@ from config import (
     PLATFORM_HIGHLIGHT, GRASS_DARK, GRASS_LIGHT,
     GRASS_TUFT_DARK, GRASS_TUFT_LIGHT, PLATFORM_GRASS_SEED,
     SHOW_VOLUME_PANEL_KEY,
+    MELEE_DAMAGE, MELEE_HIT_FRAME, MELEE_SWING_PARTICLE_COLORS,
+    RANGED_DAMAGE, RANGED_HIT_PARTICLE_COLORS,
+    RANGED_MUZZLE_PARTICLE_COLORS, RANGED_AMMO_PICKUP_AMOUNT,
+    RANGED_AMMO_MAX,
+    COMBAT_HIT_PARTICLE_COLORS, ENEMY_PARTICLE_COLORS,
 )
 
-from entities import Particle, Coin, Platform, Player, Ladder, Portal, PatrolEnemy, ChaseEnemy
+from entities import Particle, Coin, Platform, Player, Ladder, Portal, PatrolEnemy, ChaseEnemy, Bullet, AmmoPickup
 from levels import get_level_config, LEVEL_BUILDERS
 from audio import AudioManager
 from ui import VolumePanel
@@ -102,6 +107,8 @@ class Game:
         self.portals = []
         self.patrol_enemies = []
         self.chase_enemies = []
+        self.bullets = []
+        self.ammo_pickups = []
 
         self.current_level = 0
         self.game_state = GameState.LOADING
@@ -141,6 +148,10 @@ class Game:
         )
         self.player.on_land = lambda: self.audio.play_sfx(AudioManager.SFX_LAND)
         self.player.on_death = lambda: self.audio.play_sfx(AudioManager.SFX_DEATH)
+        self.player.on_melee_swing = lambda: self.audio.play_sfx(AudioManager.SFX_MELEE_SWING)
+        self.player.on_ranged_shot = lambda: self.audio.play_sfx(AudioManager.SFX_RANGED_SHOT)
+        self.player.on_reload = lambda: self.audio.play_sfx(AudioManager.SFX_RELOAD)
+        self.player.on_ammo_pickup = lambda: self.audio.play_sfx(AudioManager.SFX_AMMO_PICKUP)
 
     def _on_bgm_volume_change(self, volume):
         """背景音乐音量滑块变化回调。"""
@@ -285,6 +296,8 @@ class Game:
         self.portals = []
         self.patrol_enemies = []
         self.chase_enemies = []
+        self.bullets = []
+        self.ammo_pickups = []
 
         for x, y, w, h in level_config.ground_specs:
             self.platforms.append(Platform(x, y, w, h, is_ground=True))
@@ -311,6 +324,9 @@ class Game:
 
         for x, y in level_config.chase_enemy_specs:
             self.chase_enemies.append(ChaseEnemy(x, y))
+
+        for x, y in level_config.ammo_pickup_specs:
+            self.ammo_pickups.append(AmmoPickup(x, y))
 
     def _load_level(self, level_id, spawn_x, spawn_y, immediate=False):
         """
@@ -618,6 +634,176 @@ class Game:
         self.player.died = False
         self.menu_manager.trigger_game_over(final_score)
 
+    def _handle_melee_input(self):
+        if self.player.start_melee():
+            self._spawn_particles(
+                self.player.x + self.player.width / 2,
+                self.player.y + self.player.height / 2,
+                count=4,
+                colors=MELEE_SWING_PARTICLE_COLORS,
+                spread=4,
+                life=8,
+                size=3,
+            )
+
+    def _handle_ranged_input(self):
+        bullet = self.player.start_ranged_shot()
+        if bullet is not None:
+            self.bullets.append(bullet)
+            direction = 1 if self.player.facing_right else -1
+            self._spawn_particles(
+                self.player.x + self.player.width / 2 + direction * 15,
+                self.player.y + self.player.height / 2,
+                count=3,
+                colors=RANGED_MUZZLE_PARTICLE_COLORS,
+                spread=3,
+                life=6,
+                size=2,
+            )
+
+    def _update_bullets(self):
+        for bullet in self.bullets:
+            bullet.update(self.platforms)
+        self.bullets = [b for b in self.bullets if b.alive]
+
+    def _check_combat_hits(self):
+        if self.player.melee_active and not self.player.melee_hit_done:
+            if self.player.melee_timer <= MELEE_DURATION_FRAMES - MELEE_HIT_FRAME:
+                hitbox = self.player.get_melee_hitbox()
+                if hitbox is not None:
+                    direction = 1 if self.player.facing_right else -1
+                    for enemy in self.patrol_enemies[:]:
+                        if hitbox.colliderect(enemy.get_rect()):
+                            killed = enemy.take_damage(MELEE_DAMAGE, direction)
+                            self.audio.play_sfx(AudioManager.SFX_ENEMY_HIT)
+                            self._spawn_particles(
+                                enemy.x + enemy.width / 2,
+                                enemy.y + enemy.height / 2,
+                                count=6,
+                                colors=COMBAT_HIT_PARTICLE_COLORS,
+                                spread=4,
+                                life=12,
+                                size=4,
+                            )
+                            if killed:
+                                self._spawn_particles(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    count=15,
+                                    colors=ENEMY_PARTICLE_COLORS,
+                                    spread=6,
+                                    life=20,
+                                    size=5,
+                                )
+                                self.patrol_enemies.remove(enemy)
+                                self.score += 20
+                    for enemy in self.chase_enemies[:]:
+                        if hitbox.colliderect(enemy.get_rect()):
+                            killed = enemy.take_damage(MELEE_DAMAGE, direction)
+                            self.audio.play_sfx(AudioManager.SFX_ENEMY_HIT)
+                            self._spawn_particles(
+                                enemy.x + enemy.width / 2,
+                                enemy.y + enemy.height / 2,
+                                count=6,
+                                colors=COMBAT_HIT_PARTICLE_COLORS,
+                                spread=4,
+                                life=12,
+                                size=4,
+                            )
+                            if killed:
+                                self._spawn_particles(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    count=15,
+                                    colors=ENEMY_PARTICLE_COLORS,
+                                    spread=6,
+                                    life=20,
+                                    size=5,
+                                )
+                                self.chase_enemies.remove(enemy)
+                                self.score += 20
+                    self.player.melee_hit_done = True
+
+        for bullet in self.bullets[:]:
+            if not bullet.alive:
+                continue
+            bullet_rect = bullet.get_rect()
+            direction = 1 if bullet.vx > 0 else -1
+            for enemy in self.patrol_enemies[:]:
+                if bullet_rect.colliderect(enemy.get_rect()):
+                    killed = enemy.take_damage(bullet.damage, direction)
+                    bullet.alive = False
+                    self.audio.play_sfx(AudioManager.SFX_HIT_IMPACT)
+                    self._spawn_particles(
+                        bullet.x, bullet.y,
+                        count=5,
+                        colors=RANGED_HIT_PARTICLE_COLORS,
+                        spread=3,
+                        life=10,
+                        size=3,
+                    )
+                    if killed:
+                        self._spawn_particles(
+                            enemy.x + enemy.width / 2,
+                            enemy.y + enemy.height / 2,
+                            count=15,
+                            colors=ENEMY_PARTICLE_COLORS,
+                            spread=6,
+                            life=20,
+                            size=5,
+                        )
+                        self.patrol_enemies.remove(enemy)
+                        self.score += 20
+                    break
+            if not bullet.alive:
+                continue
+            for enemy in self.chase_enemies[:]:
+                if bullet_rect.colliderect(enemy.get_rect()):
+                    killed = enemy.take_damage(bullet.damage, direction)
+                    bullet.alive = False
+                    self.audio.play_sfx(AudioManager.SFX_HIT_IMPACT)
+                    self._spawn_particles(
+                        bullet.x, bullet.y,
+                        count=5,
+                        colors=RANGED_HIT_PARTICLE_COLORS,
+                        spread=3,
+                        life=10,
+                        size=3,
+                    )
+                    if killed:
+                        self._spawn_particles(
+                            enemy.x + enemy.width / 2,
+                            enemy.y + enemy.height / 2,
+                            count=15,
+                            colors=ENEMY_PARTICLE_COLORS,
+                            spread=6,
+                            life=20,
+                            size=5,
+                        )
+                        self.chase_enemies.remove(enemy)
+                        self.score += 20
+                    break
+
+    def _check_ammo_pickups(self):
+        player_rect = self.player.get_rect()
+        for ammo in self.ammo_pickups:
+            if not ammo.collected and player_rect.colliderect(ammo.get_rect()):
+                ammo.collected = True
+                self.player.ammo = min(
+                    RANGED_AMMO_MAX,
+                    self.player.ammo + RANGED_AMMO_PICKUP_AMOUNT,
+                )
+                if self.player.on_ammo_pickup:
+                    self.player.on_ammo_pickup()
+                self._spawn_particles(
+                    ammo.x, ammo.y,
+                    count=5,
+                    colors=[(255, 255, 100), (255, 200, 50)],
+                    spread=3,
+                    life=10,
+                    size=3,
+                )
+
     def _draw_hud(self):
         """绘制抬头显示（HUD）。"""
         SHADOW_OFFSET = 3
@@ -642,10 +828,24 @@ class Game:
             self.screen.blit(level_text, (text_x, 15))
 
         hint = self.font.render(
-            "方向键/WASD: 移动   空格: 跳跃   上下: 爬梯   传送门: 传送",
+            "移动:方向键/WASD  跳跃:空格  攀爬:上下  J:近战  K:射击  R:换弹",
             True, (50, 50, 80),
         )
         self.screen.blit(hint, (SCREEN_WIDTH - hint.get_width() - 15, 15))
+
+        ammo_color = (255, 255, 100) if self.player.ammo > 5 else (255, 80, 80)
+        if self.player.reloading:
+            ammo_color = (150, 150, 150)
+        ammo_text = self.font.render(
+            f"弹药: {self.player.ammo}/{RANGED_AMMO_MAX}",
+            True, ammo_color,
+        )
+        ammo_shadow = self.font.render(
+            f"弹药: {self.player.ammo}/{RANGED_AMMO_MAX}",
+            True, BLACK,
+        )
+        self.screen.blit(ammo_shadow, (20 + SHADOW_OFFSET, 40 + SHADOW_OFFSET))
+        self.screen.blit(ammo_text, (20, 40))
 
         audio_hint = self.font.render(
             "[V] 音频设置",
@@ -751,6 +951,14 @@ class Game:
                 if event.key == SHOW_VOLUME_PANEL_KEY and self.game_state == GameState.PLAYING:
                     self.volume_panel.toggle()
 
+                if self.game_state == GameState.PLAYING:
+                    if event.key == pygame.K_j:
+                        self._handle_melee_input()
+                    elif event.key == pygame.K_k:
+                        self._handle_ranged_input()
+                    elif event.key == pygame.K_r:
+                        self.player.start_reload()
+
             if self.game_state == GameState.PLAYING:
                 self.volume_panel.handle_event(event)
         return True
@@ -812,6 +1020,10 @@ class Game:
 
         self._check_enemy_collisions()
 
+        self._update_bullets()
+        self._check_combat_hits()
+        self._check_ammo_pickups()
+
         self.particles = [p for p in self.particles if p.life > 0]
         for p in self.particles:
             p.update()
@@ -865,6 +1077,12 @@ class Game:
 
         for enemy in self.chase_enemies:
             enemy.draw(self.screen, self.camera_x)
+
+        for ammo in self.ammo_pickups:
+            ammo.draw(self.screen, self.camera_x, self.tick)
+
+        for bullet in self.bullets:
+            bullet.draw(self.screen, self.camera_x)
 
         for p in self.particles:
             p.draw(self.screen, self.camera_x)
