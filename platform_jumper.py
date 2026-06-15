@@ -37,6 +37,18 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+import ctypes
+
+def _switch_to_english_keyboard():
+    """在 Windows 上将输入法切换为英文键盘布局。"""
+    if sys.platform != "win32":
+        return
+    try:
+        HKL_ENGLISH = 0x04090409
+        ctypes.windll.user32.ActivateKeyboardLayout(HKL_ENGLISH, 0)
+    except Exception:
+        pass
+
 import pygame
 
 from config import HEADLESS, HEALTHCHECK
@@ -46,6 +58,7 @@ from core import Game
 def main():
     """初始化 pygame 并启动游戏主循环。"""
     pygame.init()
+    _switch_to_english_keyboard()
 
     if not HEADLESS and not HEALTHCHECK:
         print("平台跳跃 启动成功！")

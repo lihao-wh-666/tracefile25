@@ -35,9 +35,7 @@ class StateManager:
         self.transition_frame = 0
         self.transition_phase = 0
         self.pending_level = 0
-        self.pending_spawn = (0, 0)
         self.loading_progress = 0.0
-        self.is_same_level = False
 
     def start_transition(self, target_level, target_x, target_y):
         """
@@ -53,13 +51,10 @@ class StateManager:
         self.transition_frame = 0
 
         if target_level == -1:
-            self.is_same_level = True
             self.pending_level = self.game.current_level
         else:
-            self.is_same_level = False
             from levels import LEVEL_BUILDERS
             self.pending_level = target_level % len(LEVEL_BUILDERS)
-        self.pending_spawn = (target_x, target_y)
 
         self.game._spawn_particles(
             self.game.player.x + self.game.player.width / 2,
@@ -88,11 +83,6 @@ class StateManager:
         elif self.transition_phase == 1:
             self.loading_progress = min(1.0, self.transition_frame / half_duration)
             if self.transition_frame >= half_duration:
-                spawn_x, spawn_y = self.pending_spawn
-                if self.is_same_level:
-                    self.game._teleport_within_level(spawn_x, spawn_y)
-                else:
-                    self.game._load_level(self.pending_level, spawn_x, spawn_y, immediate=False)
                 self.transition_phase = 2
                 self.transition_frame = 0
 

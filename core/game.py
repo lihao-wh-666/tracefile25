@@ -197,7 +197,6 @@ class Game:
             self.is_same_level_transition = False
             self.pending_level = target_level % len(LEVEL_BUILDERS)
         self.pending_spawn = (target_x, target_y)
-        self.state_manager.is_same_level = self.is_same_level_transition
 
         self._spawn_particles(
             self.player.x + self.player.width / 2,
