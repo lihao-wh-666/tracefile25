@@ -109,6 +109,8 @@ class GameState:
     PLAYING = "playing"
     TRANSITIONING = "transitioning"
     LOADING = "loading"
+    SAVE_LIST = "save_list"
+    SAVE_NAME_INPUT = "save_name_input"
 
 
 class Button:
@@ -349,7 +351,7 @@ class StorageManager:
 
     负责存储和加载：
     - 游戏设置（音量、画质、控制方式）
-    - 游戏存档（当前进度、得分）
+    - 游戏存档（当前进度、得分），支持多个命名存档
     - 排行榜数据（玩家昵称、得分、时间戳）
 
     数据以 JSON 格式存储在用户目录下的 .platform_jumper 文件夹中。
@@ -359,6 +361,7 @@ class StorageManager:
         self.save_dir = os.path.join(
             os.path.expanduser("~"), ".platform_jumper"
         )
+        self.saves_subdir = os.path.join(self.save_dir, "saves")
         self.settings_file = os.path.join(self.save_dir, "settings.json")
         self.savegame_file = os.path.join(self.save_dir, "savegame.json")
         self.leaderboard_file = os.path.join(self.save_dir, "leaderboard.json")
@@ -368,6 +371,27 @@ class StorageManager:
         """确保保存目录存在。"""
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
+        if not os.path.exists(self.saves_subdir):
+            os.makedirs(self.saves_subdir)
+
+    def _sanitize_filename(self, name):
+        """
+        清理文件名，移除非法字符。
+
+        Args:
+            name: 原始存档名称
+
+        Returns:
+            str: 清理后的安全文件名
+        """
+        invalid_chars = '<>:"/\\|?*'
+        safe_name = ''.join(c for c in name if c not in invalid_chars).strip()
+        return safe_name if safe_name else "未命名"
+
+    def _get_save_path(self, save_name):
+        """获取指定名称的存档文件路径。"""
+        safe_name = self._sanitize_filename(save_name)
+        return os.path.join(self.saves_subdir, f"{safe_name}.json")
 
     def save_settings(self, settings):
         """
@@ -407,7 +431,7 @@ class StorageManager:
 
     def save_game(self, game_data):
         """
-        保存游戏进度。
+        保存游戏进度（兼容旧版单存档接口）。
 
         Args:
             game_data: 包含游戏状态的字典
@@ -424,7 +448,7 @@ class StorageManager:
 
     def load_game(self):
         """
-        加载游戏进度。
+        加载游戏进度（兼容旧版单存档接口）。
 
         Returns:
             dict: 游戏数据字典，若不存在存档则返回 None
@@ -439,12 +463,120 @@ class StorageManager:
 
     def has_save_game(self):
         """
-        检查是否存在存档。
+        检查是否存在存档（兼容旧版接口，检查任意存档是否存在）。
 
         Returns:
             bool: 是否存在存档
         """
-        return os.path.exists(self.savegame_file)
+        if os.path.exists(self.savegame_file):
+            return True
+        return len(self.list_saves()) > 0
+
+    def list_saves(self):
+        """
+        列出所有命名存档，按修改时间倒序排列。
+
+        Returns:
+            list: 存档信息列表，每项包含 name, timestamp, level, score 等
+        """
+        saves = []
+        try:
+            if os.path.isdir(self.saves_subdir):
+                for filename in os.listdir(self.saves_subdir):
+                    if filename.endswith('.json'):
+                        save_name = filename[:-5]
+                        file_path = os.path.join(self.saves_subdir, filename)
+                        try:
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                data = json.load(f)
+                            mtime = os.path.getmtime(file_path)
+                            saves.append({
+                                "name": save_name,
+                                "timestamp": data.get("timestamp", ""),
+                                "level": data.get("level", 0),
+                                "score": data.get("score", 0),
+                                "mtime": mtime,
+                            })
+                        except (IOError, json.JSONDecodeError):
+                            continue
+        except OSError:
+            pass
+        saves.sort(key=lambda x: x.get("mtime", 0), reverse=True)
+        return saves
+
+    def save_named_game(self, save_name, game_data):
+        """
+        保存命名存档。
+
+        Args:
+            save_name: 存档名称
+            game_data: 游戏状态字典
+
+        Returns:
+            bool: 是否保存成功
+        """
+        save_data = {
+            "name": save_name,
+            "timestamp": datetime.now().isoformat(),
+            **game_data
+        }
+        file_path = self._get_save_path(save_name)
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(save_data, f, indent=2, ensure_ascii=False)
+            return True
+        except IOError:
+            return False
+
+    def load_named_game(self, save_name):
+        """
+        加载命名存档。
+
+        Args:
+            save_name: 存档名称
+
+        Returns:
+            dict: 游戏数据字典，若不存在则返回 None
+        """
+        file_path = self._get_save_path(save_name)
+        try:
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except (IOError, json.JSONDecodeError):
+            pass
+        return None
+
+    def delete_save(self, save_name):
+        """
+        删除指定名称的存档。
+
+        Args:
+            save_name: 存档名称
+
+        Returns:
+            bool: 是否删除成功
+        """
+        file_path = self._get_save_path(save_name)
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                return True
+        except OSError:
+            pass
+        return False
+
+    def save_exists(self, save_name):
+        """
+        检查指定名称的存档是否存在。
+
+        Args:
+            save_name: 存档名称
+
+        Returns:
+            bool: 是否存在
+        """
+        return os.path.exists(self._get_save_path(save_name))
 
     def add_leaderboard_entry(self, name, score):
         """
@@ -731,17 +863,11 @@ class MainMenu(Menu):
         self.manager.set_state(GameState.PLAYING)
 
     def _on_load_game(self):
-        """加载存档。"""
-        save_data = self.manager.storage.load_game()
-        if save_data:
-            self.manager.game.score = save_data.get("score", 0)
-            self.manager.game.current_level = save_data.get("level", 0)
-            spawn_x = save_data.get("spawn_x", 100)
-            spawn_y = save_data.get("spawn_y", 400)
-            self.manager.game._load_level(
-                self.manager.game.current_level, spawn_x, spawn_y, immediate=True
-            )
-            self.manager.set_state(GameState.PLAYING)
+        """打开存档列表菜单。"""
+        save_list_menu = self.manager.menus.get(GameState.SAVE_LIST)
+        if save_list_menu:
+            save_list_menu.refresh()
+        self.manager.set_state(GameState.SAVE_LIST)
 
     def _on_leaderboard(self):
         """打开排行榜。"""
@@ -911,18 +1037,11 @@ class PauseMenu(Menu):
         self.manager.set_state(GameState.PLAYING)
 
     def _on_save(self):
-        """保存游戏。"""
-        game_data = {
-            "score": self.manager.game.score,
-            "level": self.manager.game.current_level,
-            "spawn_x": self.manager.game.player.x,
-            "spawn_y": self.manager.game.player.y,
-        }
-        self.manager.storage.save_game(game_data)
-
-        main_menu = self.manager.menus.get(GameState.MAIN_MENU)
-        if main_menu:
-            main_menu.refresh_save_button()
+        """保存游戏，打开命名输入菜单。"""
+        save_name_input = self.manager.menus.get(GameState.SAVE_NAME_INPUT)
+        if save_name_input:
+            save_name_input.reset()
+        self.manager.set_state(GameState.SAVE_NAME_INPUT)
 
     def _on_restart(self):
         """重新开始当前关卡。"""
@@ -1206,6 +1325,407 @@ class LeaderboardMenu(Menu):
                 surface.blit(date_text, (col4_x, row_y))
 
 
+class SaveNameInputMenu(Menu):
+    """
+    保存时输入存档名称的菜单。
+
+    功能：
+    - 文本输入框用于输入存档名称
+    - 确认保存按钮
+    - 取消按钮
+    - 如果存档已存在，会提示覆盖确认
+    """
+
+    def __init__(self, manager):
+        super().__init__(manager, "保存游戏")
+        self.panel_height = 380
+        self.save_name = ""
+        self.name_max_length = 20
+        self.input_active = True
+        self.confirm_overwrite = False
+        self.pending_save_name = ""
+
+        self.buttons = [
+            Button(0, 0, 0, 0, "保存", self._on_save),
+            Button(0, 0, 0, 0, "取消", self._on_cancel),
+        ]
+
+        self._layout_buttons(button_width=180, button_height=40, spacing=15)
+        self.buttons[0].rect.x = self._panel_x + 70
+        self.buttons[0].rect.y = self._panel_y + self.panel_height - 100
+        self.buttons[1].rect.x = self._panel_x + self.panel_width - 250
+        self.buttons[1].rect.y = self._panel_y + self.panel_height - 100
+
+        self._hint_font = get_chinese_font(24)
+
+    def reset(self):
+        """重置输入状态。"""
+        self.save_name = ""
+        self.input_active = True
+        self.confirm_overwrite = False
+        self.pending_save_name = ""
+        self.selected_index = 0
+        self._update_selection(0)
+
+    def _on_save(self):
+        """确认保存按钮回调。"""
+        name = self.save_name.strip()
+        if not name:
+            name = "未命名"
+
+        if self.manager.storage.save_exists(name) and not self.confirm_overwrite:
+            self.pending_save_name = name
+            self.confirm_overwrite = True
+            self.buttons[0].text = "确认覆盖"
+            return
+
+        game_data = {
+            "score": self.manager.game.score,
+            "level": self.manager.game.current_level,
+            "spawn_x": self.manager.game.player.x,
+            "spawn_y": self.manager.game.player.y,
+        }
+        self.manager.storage.save_named_game(name, game_data)
+
+        self.confirm_overwrite = False
+        self.pending_save_name = ""
+        self.buttons[0].text = "保存"
+
+        self.manager.set_state(GameState.PAUSED)
+
+    def _on_cancel(self):
+        """取消按钮回调。"""
+        self.confirm_overwrite = False
+        self.pending_save_name = ""
+        self.buttons[0].text = "保存"
+        if self.manager.previous_state == GameState.PAUSED:
+            self.manager.set_state(GameState.PAUSED)
+        else:
+            self.manager.set_state(GameState.MAIN_MENU)
+
+    def on_escape(self):
+        """ESC 返回。"""
+        self._on_cancel()
+
+    def handle_event(self, event):
+        """处理输入菜单事件，包括文本输入。"""
+        if self.input_active and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                self.save_name = self.save_name[:-1]
+                return True
+            elif event.key == pygame.K_RETURN:
+                if self.confirm_overwrite:
+                    self._on_save()
+                else:
+                    self._on_save()
+                return True
+            elif len(self.save_name) < self.name_max_length:
+                char = event.unicode
+                if char.isprintable():
+                    self.save_name += char
+                    self.confirm_overwrite = False
+                    self.buttons[0].text = "保存"
+                    return True
+
+        return super().handle_event(event)
+
+    def draw(self, surface, big_font, normal_font, small_font):
+        """绘制保存名称输入菜单。"""
+        super().draw(surface, big_font, normal_font, small_font)
+
+        center_x = SCREEN_WIDTH // 2
+        input_y = self._panel_y + 140
+
+        label = normal_font.render("存档名称:", True, MENU_TEXT_COLOR)
+        surface.blit(label, (center_x - 180, input_y))
+
+        input_rect = pygame.Rect(center_x - 60, input_y - 5, 240, 36)
+        pygame.draw.rect(surface, (30, 30, 50), input_rect, border_radius=5)
+        pygame.draw.rect(surface, (100, 200, 255), input_rect, width=2, border_radius=5)
+
+        display_name = self.save_name
+        if self.input_active and (pygame.time.get_ticks() // 500) % 2 == 0:
+            display_name += "|"
+
+        name_text = normal_font.render(display_name, True, MENU_TEXT_COLOR)
+        surface.blit(name_text, (input_rect.x + 8, input_rect.y + 4))
+
+        hint = self._hint_font.render(
+            f"最多 {self.name_max_length} 个字符", True, MENU_HINT_COLOR
+        )
+        surface.blit(hint, (center_x - 60, input_y + 40))
+
+        if self.confirm_overwrite:
+            warn = self._hint_font.render(
+                f"存档 '{self.pending_save_name}' 已存在，确定覆盖？",
+                True, (255, 200, 100)
+            )
+            surface.blit(
+                warn,
+                (center_x - warn.get_width() // 2, input_y + 75)
+            )
+
+
+class SaveListMenu(Menu):
+    """
+    存档列表菜单。
+
+    功能：
+    - 显示所有存档列表（名称、关卡、得分、保存时间）
+    - 选择并加载存档
+    - 删除存档（带确认）
+    - 支持鼠标和键盘导航
+    - 可配置为"加载模式"或"选择模式"
+    """
+
+    def __init__(self, manager, mode="load"):
+        super().__init__(manager, "选择存档")
+        self.panel_height = 560
+        self.mode = mode
+        self.saves = []
+        self.selected_save_index = 0
+        self.delete_confirm_index = -1
+        self.scroll_offset = 0
+        self.max_visible = 5
+
+        self.buttons = [
+            Button(0, 0, 0, 0, "加载", self._on_load),
+            Button(0, 0, 0, 0, "删除", self._on_delete),
+            Button(0, 0, 0, 0, "返回", self._on_back),
+        ]
+
+        self._layout_buttons(button_width=140, button_height=38, spacing=10)
+        btn_start_y = self._panel_y + self.panel_height - 70
+        self.buttons[0].rect.x = self._panel_x + 50
+        self.buttons[0].rect.y = btn_start_y
+        self.buttons[1].rect.x = self._panel_x + self.panel_width // 2 - 70
+        self.buttons[1].rect.y = btn_start_y
+        self.buttons[2].rect.x = self._panel_x + self.panel_width - 190
+        self.buttons[2].rect.y = btn_start_y
+
+        self._save_name_font = get_chinese_font(24)
+        self._save_info_font = get_chinese_font(20)
+        self._header_font = get_chinese_font(22)
+
+    def refresh(self):
+        """刷新存档列表。"""
+        self.saves = self.manager.storage.list_saves()
+        self.selected_save_index = 0
+        self.delete_confirm_index = -1
+        self.scroll_offset = 0
+        self._update_buttons_state()
+
+    def _update_buttons_state(self):
+        """更新按钮启用状态。"""
+        has_saves = len(self.saves) > 0
+        self.buttons[0].enabled = has_saves
+        self.buttons[1].enabled = has_saves
+
+    def _on_load(self):
+        """加载选中的存档。"""
+        if not self.saves or self.selected_save_index >= len(self.saves):
+            return
+
+        save_name = self.saves[self.selected_save_index]["name"]
+        save_data = self.manager.storage.load_named_game(save_name)
+
+        if save_data:
+            self.manager.game.score = save_data.get("score", 0)
+            self.manager.game.current_level = save_data.get("level", 0)
+            spawn_x = save_data.get("spawn_x", 100)
+            spawn_y = save_data.get("spawn_y", 400)
+            self.manager.game._load_level(
+                self.manager.game.current_level, spawn_x, spawn_y, immediate=True
+            )
+            self.manager.set_state(GameState.PLAYING)
+
+    def _on_delete(self):
+        """删除选中的存档。"""
+        if not self.saves or self.selected_save_index >= len(self.saves):
+            return
+
+        if self.delete_confirm_index == self.selected_save_index:
+            save_name = self.saves[self.selected_save_index]["name"]
+            self.manager.storage.delete_save(save_name)
+            self.refresh()
+
+            main_menu = self.manager.menus.get(GameState.MAIN_MENU)
+            if main_menu:
+                main_menu.refresh_save_button()
+        else:
+            self.delete_confirm_index = self.selected_save_index
+
+    def _on_back(self):
+        """返回上一级菜单。"""
+        self.delete_confirm_index = -1
+        if self.manager.previous_state == GameState.PAUSED:
+            self.manager.set_state(GameState.PAUSED)
+        else:
+            self.manager.set_state(GameState.MAIN_MENU)
+
+    def on_escape(self):
+        """ESC 返回。"""
+        self._on_back()
+
+    def handle_event(self, event):
+        """处理存档列表菜单事件。"""
+        if event.type == pygame.KEYDOWN and self.saves:
+            if event.key == pygame.K_UP:
+                self._select_previous()
+                self._play_menu_sound()
+                return True
+            elif event.key == pygame.K_DOWN:
+                self._select_next()
+                self._play_menu_sound()
+                return True
+            elif event.key == pygame.K_RETURN:
+                if self.delete_confirm_index == self.selected_save_index:
+                    self._on_delete()
+                else:
+                    self._on_load()
+                return True
+            elif event.key == pygame.K_DELETE or event.key == pygame.K_d:
+                self._on_delete()
+                return True
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._check_save_click(event.pos):
+                return True
+
+        return super().handle_event(event)
+
+    def _select_previous(self):
+        """选择上一个存档。"""
+        if self.saves:
+            self.selected_save_index = (self.selected_save_index - 1) % len(self.saves)
+            self.delete_confirm_index = -1
+            self._adjust_scroll()
+
+    def _select_next(self):
+        """选择下一个存档。"""
+        if self.saves:
+            self.selected_save_index = (self.selected_save_index + 1) % len(self.saves)
+            self.delete_confirm_index = -1
+            self._adjust_scroll()
+
+    def _adjust_scroll(self):
+        """调整滚动偏移以确保选中项可见。"""
+        if self.selected_save_index < self.scroll_offset:
+            self.scroll_offset = self.selected_save_index
+        elif self.selected_save_index >= self.scroll_offset + self.max_visible:
+            self.scroll_offset = self.selected_save_index - self.max_visible + 1
+
+    def _check_save_click(self, pos):
+        """检查是否点击了某个存档项。"""
+        list_x = self._panel_x + 30
+        list_y = self._panel_y + 90
+        item_height = 60
+
+        for i in range(self.max_visible):
+            save_idx = self.scroll_offset + i
+            if save_idx >= len(self.saves):
+                break
+
+            item_rect = pygame.Rect(list_x, list_y + i * item_height, self.panel_width - 60, item_height - 8)
+            if item_rect.collidepoint(pos):
+                self.selected_save_index = save_idx
+                self.delete_confirm_index = -1
+                return True
+
+        return False
+
+    def draw(self, surface, big_font, normal_font, small_font):
+        """绘制存档列表菜单。"""
+        super().draw(surface, big_font, normal_font, small_font)
+
+        list_x = self._panel_x + 30
+        list_y = self._panel_y + 90
+        item_height = 60
+        list_width = self.panel_width - 60
+
+        header_bg = pygame.Rect(list_x, list_y - 30, list_width, 28)
+        pygame.draw.rect(surface, (50, 50, 90), header_bg, border_radius=5)
+
+        name_header = self._header_font.render("存档名称", True, (180, 200, 255))
+        surface.blit(name_header, (list_x + 10, list_y - 27))
+
+        level_header = self._header_font.render("关卡", True, (180, 200, 255))
+        surface.blit(level_header, (list_x + 220, list_y - 27))
+
+        score_header = self._header_font.render("得分", True, (180, 200, 255))
+        surface.blit(score_header, (list_x + 300, list_y - 27))
+
+        if not self.saves:
+            no_data = self._save_info_font.render(
+                "暂无存档", True, MENU_HINT_COLOR
+            )
+            surface.blit(
+                no_data,
+                (list_x + (list_width - no_data.get_width()) // 2,
+                 list_y + 80)
+            )
+            return
+
+        for i in range(self.max_visible):
+            save_idx = self.scroll_offset + i
+            if save_idx >= len(self.saves):
+                break
+
+            save = self.saves[save_idx]
+            is_selected = save_idx == self.selected_save_index
+            is_delete_confirm = save_idx == self.delete_confirm_index
+
+            item_y = list_y + i * item_height
+            item_rect = pygame.Rect(list_x, item_y, list_width, item_height - 8)
+
+            if is_selected:
+                pygame.draw.rect(surface, (80, 120, 200), item_rect, border_radius=6)
+                pygame.draw.rect(surface, BUTTON_BORDER, item_rect, width=2, border_radius=6)
+            else:
+                pygame.draw.rect(surface, (45, 45, 75), item_rect, border_radius=6)
+
+            name_text = self._save_name_font.render(
+                save["name"], True, MENU_TITLE_COLOR
+            )
+            surface.blit(name_text, (list_x + 12, item_y + 6))
+
+            level_text = self._save_info_font.render(
+                f"第 {save.get('level', 0) + 1} 关", True, MENU_TEXT_COLOR
+            )
+            surface.blit(level_text, (list_x + 220, item_y + 10))
+
+            score_text = self._save_info_font.render(
+                str(save.get("score", 0)), True, (100, 200, 255)
+            )
+            surface.blit(score_text, (list_x + 300, item_y + 10))
+
+            time_text = self._save_info_font.render(
+                save.get("timestamp", "")[:16].replace("T", " "),
+                True, MENU_HINT_COLOR
+            )
+            surface.blit(time_text, (list_x + 12, item_y + 32))
+
+            if is_delete_confirm:
+                confirm_text = self._save_info_font.render(
+                    "按删除键或再次点击确认删除", True, (255, 150, 100)
+                )
+                surface.blit(
+                    confirm_text,
+                    (list_x + list_width - confirm_text.get_width() - 10, item_y + 32)
+                )
+
+        if len(self.saves) > self.max_visible:
+            scroll_x = list_x + list_width + 5
+            scroll_bg = pygame.Rect(scroll_x, list_y, 6, self.max_visible * item_height - 8)
+            pygame.draw.rect(surface, (40, 40, 70), scroll_bg, border_radius=3)
+
+            total = len(self.saves)
+            thumb_height = int((self.max_visible / total) * (self.max_visible * item_height - 8))
+            thumb_y = list_y + int((self.scroll_offset / total) * (self.max_visible * item_height - 8))
+            scroll_thumb = pygame.Rect(scroll_x, thumb_y, 6, max(thumb_height, 10))
+            pygame.draw.rect(surface, (100, 150, 200), scroll_thumb, border_radius=3)
+
+
 class MenuManager:
     """
     菜单状态管理器。
@@ -1237,6 +1757,8 @@ class MenuManager:
             GameState.PAUSED: PauseMenu(self),
             GameState.GAME_OVER: GameOverMenu(self),
             GameState.LEADERBOARD: LeaderboardMenu(self),
+            GameState.SAVE_LIST: SaveListMenu(self),
+            GameState.SAVE_NAME_INPUT: SaveNameInputMenu(self),
         }
 
         self._apply_saved_settings()
