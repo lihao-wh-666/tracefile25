@@ -959,17 +959,20 @@ class Player:
                 self._draw_knife(surface, knife_hand_x, knife_hand_y, knife_angle, camera_x)
 
         if not self.climbing and self.weapon_state == "gun":
-            gun_hand_x = (body_right + 2 + front_arm_offset_x) if direction > 0 else (body_left - 2 + front_arm_offset_x)
-            gun_hand_y = body_top + 17 + (front_arm_y - arm_shoulder_y)
             if self.melee_active:
                 gun_angle = base_angle + math.radians(direction * 60)
-                self._draw_gun(surface, gun_hand_x, gun_hand_y + 4, gun_angle, direction, camera_x)
+                self._draw_gun(surface, knife_hand_x, knife_hand_y + 4, gun_angle, direction, camera_x)
             else:
-                gun_angle = base_angle + math.radians(direction * 3)
-                self._draw_gun(surface, gun_hand_x, gun_hand_y, gun_angle, direction, camera_x)
+                gun_angle = base_angle + math.radians(direction * 10)
+                self._draw_gun(surface, knife_hand_x, knife_hand_y, gun_angle, direction, camera_x)
 
         if self.muzzle_flash_timer > 0 and not self.climbing and self.weapon_state == "gun":
-            self._draw_muzzle_flash(surface, camera_x, None, direction)
+            if self.melee_active:
+                muzzle_angle = base_angle + math.radians(direction * 60)
+            else:
+                muzzle_angle = base_angle + math.radians(direction * 10)
+            self._draw_muzzle_flash(surface, camera_x, None, direction,
+                                    knife_hand_x, knife_hand_y, muzzle_angle)
 
         if self.reloading:
             reload_progress = 1.0 - self.reload_timer / RANGED_RELOAD_FRAMES
@@ -1542,17 +1545,19 @@ class Player:
                                      (int(sx), int(sy)),
                                      max(1, int(3 * (1 - imp_t))))
 
-    def _draw_muzzle_flash(self, surface, camera_x, body_rect, direction):
-        gun_angle = 0.0 if self.facing_right else math.pi
-        gun_angle += math.radians(direction * 3)
+    def _draw_muzzle_flash(self, surface, camera_x, body_rect, direction, gun_hand_x=None, gun_hand_y=None, gun_angle=None):
+        if gun_angle is None:
+            gun_angle = 0.0 if self.facing_right else math.pi
+            gun_angle += math.radians(direction * 3)
         cos_a = math.cos(gun_angle)
         sin_a = math.sin(gun_angle)
         perp_x = -sin_a
         perp_y = cos_a
 
-        body_edge_x = self.x + self.width / 2 + direction * 11
-        gun_hand_x = body_edge_x - camera_x
-        gun_hand_y = self.y + 35
+        if gun_hand_x is None or gun_hand_y is None:
+            body_edge_x = self.x + self.width / 2 + direction * 11
+            gun_hand_x = body_edge_x - camera_x
+            gun_hand_y = self.y + 35
 
         recoil_offset = 0
         if self.ranged_shot_timer > 0:
