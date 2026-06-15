@@ -16,6 +16,8 @@ menus.py - 游戏菜单系统模块
 
 import os
 import json
+import sys
+import ctypes
 import pygame
 from datetime import datetime
 
@@ -25,6 +27,17 @@ from config import (
     AUDIO_BGM_VOLUME_DEFAULT, AUDIO_SFX_VOLUME_DEFAULT,
 )
 from audio import AudioManager
+
+
+def switch_to_english_keyboard():
+    """在 Windows 上将输入法切换为英文键盘布局。"""
+    if sys.platform != "win32":
+        return
+    try:
+        HKL_ENGLISH = 0x04090409
+        ctypes.windll.user32.ActivateKeyboardLayout(HKL_ENGLISH, 0)
+    except Exception:
+        pass
 
 
 _FONT_CACHE = {}
@@ -1779,6 +1792,9 @@ class MenuManager:
         """
         self.previous_state = self.current_state
         self.current_state = new_state
+
+        if new_state in self.menus or new_state == GameState.PLAYING:
+            switch_to_english_keyboard()
 
         if new_state == GameState.PLAYING:
             if self.audio and not self.audio.is_bgm_playing():
