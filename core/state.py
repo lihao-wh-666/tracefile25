@@ -83,6 +83,8 @@ class StateManager:
             if self.transition_frame >= half_duration:
                 spawn_x, spawn_y = self.pending_spawn
                 self.game._load_level(self.pending_level, spawn_x, spawn_y, immediate=False)
+                self.transition_phase = 2
+                self.transition_frame = 0
 
         elif self.transition_phase == 2:
             if self.transition_frame >= half_duration:
