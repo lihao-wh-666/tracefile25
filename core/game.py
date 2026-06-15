@@ -28,6 +28,7 @@ from config import (
     TOTAL_LEVELS,
     SHOW_VOLUME_PANEL_KEY,
     RANGED_AMMO_MAX,
+    PORTAL_COOLDOWN_FRAMES,
 )
 
 from entities import Player, Particle, Coin, Platform, Ladder, Portal, PatrolEnemy, ChaseEnemy, Bullet, AmmoPickup
@@ -102,6 +103,7 @@ class Game:
         self.transition_phase = 0
         self.pending_level = 0
         self.pending_spawn = (PLAYER_SPAWN_X, PLAYER_SPAWN_Y)
+        self.is_same_level_transition = False
         self.level_config = None
         self.loading_progress = 0.0
 
@@ -189,10 +191,13 @@ class Game:
         self.transition_frame = 0
 
         if target_level == -1:
+            self.is_same_level_transition = True
             self.pending_level = self.current_level
         else:
+            self.is_same_level_transition = False
             self.pending_level = target_level % len(LEVEL_BUILDERS)
         self.pending_spawn = (target_x, target_y)
+        self.state_manager.is_same_level = self.is_same_level_transition
 
         self._spawn_particles(
             self.player.x + self.player.width / 2,
@@ -209,7 +214,33 @@ class Game:
         result = self.state_manager.update_transition()
         if result == "start_loading":
             spawn_x, spawn_y = self.pending_spawn
-            self._load_level(self.pending_level, spawn_x, spawn_y, immediate=False)
+            if self.is_same_level_transition:
+                self._teleport_within_level(spawn_x, spawn_y)
+            else:
+                self._load_level(self.pending_level, spawn_x, spawn_y, immediate=False)
+
+    def _teleport_within_level(self, target_x, target_y):
+        """同关卡内传送，只移动玩家位置，保留所有物品和怪物状态。"""
+        self.player.x = target_x
+        self.player.y = target_y
+        self.player.vx = 0
+        self.player.vy = 0
+        self.player.climbing = False
+        self.player.current_ladder = None
+        self.player.jump_count = 0
+        self.player.on_ground = False
+
+        self.camera_x = 0
+        target_camera_x = target_x - SCREEN_WIDTH / CAMERA_TARGET_RATIO
+        self.camera_x = max(0, min(target_camera_x, LEVEL_WIDTH - SCREEN_WIDTH))
+
+        portal = None
+        for p in self.portals:
+            if abs(p.x + p.width / 2 - target_x) < 50 and abs(p.y + p.height / 2 - target_y) < 50:
+                portal = p
+                break
+        if portal is not None and portal.cooldown <= 0:
+            portal.cooldown = PORTAL_COOLDOWN_FRAMES
 
     def _spawn_particles(
         self, x, y, count, colors=PARTICLE_COLORS,
@@ -693,11 +724,12 @@ class Game:
                     self.volume_panel.toggle()
 
                 if self.game_state == GameState.PLAYING:
-                    if event.key == pygame.K_j:
+                    key_char = event.unicode.lower() if event.unicode else ''
+                    if event.key == pygame.K_j or key_char == 'j':
                         self._handle_melee_input()
-                    elif event.key == pygame.K_k:
+                    elif event.key == pygame.K_k or key_char == 'k':
                         self._handle_ranged_input()
-                    elif event.key == pygame.K_r:
+                    elif event.key == pygame.K_r or key_char == 'r':
                         self.player.start_reload()
 
             if self.game_state == GameState.PLAYING:
