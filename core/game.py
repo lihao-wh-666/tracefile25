@@ -386,123 +386,186 @@ class Game:
 
     def _update_bullets(self):
         """更新子弹状态。"""
-        remaining = []
         for bullet in self.bullets:
             bullet.update(self.platforms)
-            if not bullet.dead:
-                remaining.append(bullet)
-        self.bullets = remaining
+        self.bullets = [b for b in self.bullets if b.alive]
 
     def _check_combat_hits(self):
         """检测战斗命中。"""
-        for bullet in self.bullets:
+        from config import (
+            MELEE_DAMAGE, MELEE_DURATION_FRAMES, MELEE_HIT_FRAME,
+            COMBAT_HIT_PARTICLE_COLORS, ENEMY_PARTICLE_COLORS,
+            RANGED_HIT_PARTICLE_COLORS,
+        )
+
+        if self.player.melee_active and not self.player.melee_hit_done:
+            if self.player.melee_timer <= MELEE_DURATION_FRAMES - MELEE_HIT_FRAME:
+                hitbox = self.player.get_melee_hitbox()
+                if hitbox is not None:
+                    direction = 1 if self.player.facing_right else -1
+                    for enemy in self.patrol_enemies[:]:
+                        if hitbox.colliderect(enemy.get_rect()):
+                            killed = enemy.take_damage(MELEE_DAMAGE, direction)
+                            self.audio.play_sfx(AudioManager.SFX_ENEMY_HIT)
+                            self._spawn_particles(
+                                enemy.x + enemy.width / 2,
+                                enemy.y + enemy.height / 2,
+                                count=10,
+                                colors=COMBAT_HIT_PARTICLE_COLORS,
+                                spread=6,
+                                life=14,
+                                size=5,
+                            )
+                            self._spawn_particles(
+                                enemy.x + enemy.width / 2,
+                                enemy.y + enemy.height / 2,
+                                count=4,
+                                colors=[(255, 255, 255), (220, 230, 255)],
+                                spread=3,
+                                life=6,
+                                size=3,
+                            )
+                            if killed:
+                                self._spawn_particles(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    count=20,
+                                    colors=ENEMY_PARTICLE_COLORS,
+                                    spread=8,
+                                    life=25,
+                                    size=6,
+                                )
+                                self._spawn_particles(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    count=6,
+                                    colors=[(255, 255, 200), (255, 255, 255)],
+                                    spread=4,
+                                    life=10,
+                                    size=3,
+                                )
+                                self.patrol_enemies.remove(enemy)
+                                self.score += 20
+                    for enemy in self.chase_enemies[:]:
+                        if hitbox.colliderect(enemy.get_rect()):
+                            killed = enemy.take_damage(MELEE_DAMAGE, direction)
+                            self.audio.play_sfx(AudioManager.SFX_ENEMY_HIT)
+                            self._spawn_particles(
+                                enemy.x + enemy.width / 2,
+                                enemy.y + enemy.height / 2,
+                                count=10,
+                                colors=COMBAT_HIT_PARTICLE_COLORS,
+                                spread=6,
+                                life=14,
+                                size=5,
+                            )
+                            self._spawn_particles(
+                                enemy.x + enemy.width / 2,
+                                enemy.y + enemy.height / 2,
+                                count=4,
+                                colors=[(255, 255, 255), (220, 230, 255)],
+                                spread=3,
+                                life=6,
+                                size=3,
+                            )
+                            if killed:
+                                self._spawn_particles(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    count=20,
+                                    colors=ENEMY_PARTICLE_COLORS,
+                                    spread=8,
+                                    life=25,
+                                    size=6,
+                                )
+                                self._spawn_particles(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    count=6,
+                                    colors=[(255, 255, 200), (255, 255, 255)],
+                                    spread=4,
+                                    life=10,
+                                    size=3,
+                                )
+                                self.chase_enemies.remove(enemy)
+                                self.score += 20
+                    self.player.melee_hit_done = True
+
+        for bullet in self.bullets[:]:
+            if not bullet.alive:
+                continue
             bullet_rect = bullet.get_rect()
-            for enemy in self.patrol_enemies:
-                if enemy.health > 0 and bullet_rect.colliderect(enemy.get_rect()):
-                    enemy.take_damage(bullet.damage)
-                    bullet.dead = True
-                    self.audio.play_sfx(AudioManager.SFX_ENEMY_HIT)
+            direction = 1 if bullet.vx > 0 else -1
+            for enemy in self.patrol_enemies[:]:
+                if bullet_rect.colliderect(enemy.get_rect()):
+                    killed = enemy.take_damage(bullet.damage, direction)
+                    bullet.alive = False
+                    self.audio.play_sfx(AudioManager.SFX_HIT_IMPACT)
                     self._spawn_particles(
                         bullet.x, bullet.y,
-                        count=6,
-                        colors=[(255, 100, 100), (200, 50, 50), (255, 200, 200)],
-                        spread=4,
+                        count=8,
+                        colors=RANGED_HIT_PARTICLE_COLORS,
+                        spread=5,
                         life=12,
-                        size=3,
+                        size=4,
                     )
-                    if enemy.health <= 0:
+                    self._spawn_particles(
+                        bullet.x, bullet.y,
+                        count=3,
+                        colors=[(255, 255, 200), (255, 200, 80)],
+                        spread=2,
+                        life=5,
+                        size=2,
+                    )
+                    if killed:
                         self._spawn_particles(
                             enemy.x + enemy.width / 2,
                             enemy.y + enemy.height / 2,
                             count=20,
-                            colors=[(139, 69, 19), (160, 82, 45), (210, 105, 30)],
-                            spread=6,
-                            life=30,
-                            size=4,
+                            colors=ENEMY_PARTICLE_COLORS,
+                            spread=8,
+                            life=25,
+                            size=6,
                         )
+                        self.patrol_enemies.remove(enemy)
+                        self.score += 20
                     break
-            if bullet.dead:
+            if not bullet.alive:
                 continue
-            for enemy in self.chase_enemies:
-                if enemy.health > 0 and bullet_rect.colliderect(enemy.get_rect()):
-                    enemy.take_damage(bullet.damage)
-                    bullet.dead = True
-                    self.audio.play_sfx(AudioManager.SFX_ENEMY_HIT)
+            for enemy in self.chase_enemies[:]:
+                if bullet_rect.colliderect(enemy.get_rect()):
+                    killed = enemy.take_damage(bullet.damage, direction)
+                    bullet.alive = False
+                    self.audio.play_sfx(AudioManager.SFX_HIT_IMPACT)
                     self._spawn_particles(
                         bullet.x, bullet.y,
-                        count=6,
-                        colors=[(255, 100, 100), (200, 50, 50), (255, 200, 200)],
-                        spread=4,
+                        count=8,
+                        colors=RANGED_HIT_PARTICLE_COLORS,
+                        spread=5,
                         life=12,
-                        size=3,
+                        size=4,
                     )
-                    if enemy.health <= 0:
+                    self._spawn_particles(
+                        bullet.x, bullet.y,
+                        count=3,
+                        colors=[(255, 255, 200), (255, 200, 80)],
+                        spread=2,
+                        life=5,
+                        size=2,
+                    )
+                    if killed:
                         self._spawn_particles(
                             enemy.x + enemy.width / 2,
                             enemy.y + enemy.height / 2,
                             count=20,
-                            colors=[(139, 69, 19), (160, 82, 45), (210, 105, 30)],
-                            spread=6,
-                            life=30,
-                            size=4,
+                            colors=ENEMY_PARTICLE_COLORS,
+                            spread=8,
+                            life=25,
+                            size=6,
                         )
+                        self.chase_enemies.remove(enemy)
+                        self.score += 20
                     break
-
-        for enemy in self.patrol_enemies:
-            if enemy.health <= 0:
-                continue
-            hit = self.player.check_melee_hit(enemy)
-            if hit:
-                enemy.take_damage(hit)
-                self.audio.play_sfx(AudioManager.SFX_HIT_IMPACT)
-                direction = 1 if self.player.facing_right else -1
-                self._spawn_particles(
-                    enemy.x + enemy.width / 2,
-                    enemy.y + enemy.height / 2,
-                    count=8,
-                    colors=[(255, 150, 150), (255, 200, 200), (255, 255, 255)],
-                    spread=5,
-                    life=15,
-                    size=3,
-                )
-                if enemy.health <= 0:
-                    self._spawn_particles(
-                        enemy.x + enemy.width / 2,
-                        enemy.y + enemy.height / 2,
-                        count=20,
-                        colors=[(139, 69, 19), (160, 82, 45), (210, 105, 30)],
-                        spread=6,
-                        life=30,
-                        size=4,
-                    )
-
-        for enemy in self.chase_enemies:
-            if enemy.health <= 0:
-                continue
-            hit = self.player.check_melee_hit(enemy)
-            if hit:
-                enemy.take_damage(hit)
-                self.audio.play_sfx(AudioManager.SFX_HIT_IMPACT)
-                direction = 1 if self.player.facing_right else -1
-                self._spawn_particles(
-                    enemy.x + enemy.width / 2,
-                    enemy.y + enemy.height / 2,
-                    count=8,
-                    colors=[(255, 150, 150), (255, 200, 200), (255, 255, 255)],
-                    spread=5,
-                    life=15,
-                    size=3,
-                )
-                if enemy.health <= 0:
-                    self._spawn_particles(
-                        enemy.x + enemy.width / 2,
-                        enemy.y + enemy.height / 2,
-                        count=20,
-                        colors=[(139, 69, 19), (160, 82, 45), (210, 105, 30)],
-                        spread=6,
-                        life=30,
-                        size=4,
-                    )
 
     def _check_ammo_pickups(self):
         """检测弹药拾取。"""
