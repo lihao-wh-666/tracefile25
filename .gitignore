@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 start_*
 test_output/
+*.bak
