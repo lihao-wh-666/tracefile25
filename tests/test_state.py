@@ -41,6 +41,15 @@ class MockPlayer:
         self.height = 48
 
 
+class MockMenuManager:
+    """模拟菜单管理器。"""
+    def __init__(self):
+        self.current_state = GameState.MAIN_MENU
+    
+    def set_state(self, new_state):
+        self.current_state = new_state
+
+
 class MockGame:
     """模拟 Game 主类。"""
     def __init__(self):
@@ -51,6 +60,7 @@ class MockGame:
         self.particles = []
         self.level_config = None
         self.camera_x = 0
+        self.menu_manager = MockMenuManager()
 
     def _spawn_particles(self, x, y, count=10, colors=None, spread=3, life=20, size=3):
         for _ in range(count):

@@ -183,6 +183,7 @@ class Game:
 
     def _start_transition(self, target_level, target_x, target_y):
         """启动关卡切换过渡流程。"""
+        self.menu_manager.set_state(GameState.TRANSITIONING)
         self.game_state = GameState.TRANSITIONING
         self.transition_phase = 0
         self.transition_frame = 0
@@ -580,8 +581,8 @@ class Game:
                 if self.player.on_ammo_pickup:
                     self.player.on_ammo_pickup()
                 self._spawn_particles(
-                    ammo.x + ammo.width / 2,
-                    ammo.y + ammo.height / 2,
+                    ammo.x,
+                    ammo.y,
                     count=10,
                     colors=[(255, 215, 0), (255, 255, 150), (255, 200, 50)],
                     spread=4,
@@ -852,6 +853,9 @@ class Game:
                 pygame.quit()
                 sys.exit(0)
 
+            current_state = self.menu_manager.current_state
+            self.game_state = current_state
+
             running = self._handle_events()
             if not running:
                 break
@@ -861,17 +865,13 @@ class Game:
             if HEADLESS and HEALTHCHECK:
                 keys = self._build_healthcheck_keys()
 
-            current_state = self.menu_manager.current_state
-
             if current_state == GameState.PLAYING:
-                self.game_state = GameState.PLAYING
                 self._update_world(keys)
             elif current_state == GameState.PAUSED:
-                self.game_state = GameState.PAUSED
+                pass
             elif current_state in (GameState.TRANSITIONING, GameState.LOADING):
                 self._update_transition()
             else:
-                self.game_state = current_state
                 self.menu_manager.update()
 
             self._render()

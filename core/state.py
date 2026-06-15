@@ -13,6 +13,7 @@ from config import (
     LOADING_BAR_WIDTH, LOADING_BAR_HEIGHT,
     LOADING_BAR_BG, LOADING_BAR_FG, LOADING_TEXT_COLOR,
     TOTAL_LEVELS,
+    PORTAL_PARTICLE_COLORS,
 )
 
 from menus import GameState
@@ -46,6 +47,7 @@ class StateManager:
             target_x, target_y: 目标出生坐标
         """
         self.game.game_state = GameState.TRANSITIONING
+        self.game.menu_manager.set_state(GameState.TRANSITIONING)
         self.transition_phase = 0
         self.transition_frame = 0
 
@@ -60,7 +62,7 @@ class StateManager:
             self.game.player.x + self.game.player.width / 2,
             self.game.player.y + self.game.player.height / 2,
             count=20,
-            colors=self.game.portal_particle_colors,
+            colors=PORTAL_PARTICLE_COLORS,
             spread=5,
             life=30,
             size=5,
@@ -76,7 +78,9 @@ class StateManager:
                 self.transition_phase = 1
                 self.transition_frame = 0
                 self.game.game_state = GameState.LOADING
+                self.game.menu_manager.set_state(GameState.LOADING)
                 self.loading_progress = 0.0
+                return "start_loading"
 
         elif self.transition_phase == 1:
             self.loading_progress = min(1.0, self.transition_frame / half_duration)
@@ -89,8 +93,10 @@ class StateManager:
         elif self.transition_phase == 2:
             if self.transition_frame >= half_duration:
                 self.game.game_state = GameState.PLAYING
+                self.game.menu_manager.set_state(GameState.PLAYING)
                 self.transition_phase = 0
                 self.transition_frame = 0
+        return None
 
     def draw_transition(self, screen):
         """绘制过渡动画遮罩层（淡出/淡入）。"""

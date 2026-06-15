@@ -89,6 +89,7 @@ class PlayerBase:
 
         self.ranged_cooldown = 0
         self.ammo = RANGED_AMMO_INITIAL
+        self.ammo_max = RANGED_AMMO_MAX
         self.reloading = False
         self.reload_timer = 0
 

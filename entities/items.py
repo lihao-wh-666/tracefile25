@@ -155,6 +155,8 @@ class AmmoPickup:
         self.x = x
         self.y = y
         self.radius = 8
+        self.width = self.radius * 2
+        self.height = self.radius * 2
         self.amount = amount
         self.collected = False
         self.bob_offset = random.random() * math.pi * 2
