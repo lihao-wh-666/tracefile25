@@ -98,7 +98,7 @@ class PowerupBase:
     @property
     def can_activate(self) -> bool:
         """道具当前是否可以激活。"""
-        return self.state == PowerupState.IDLE
+        return self.acquired and self.state == PowerupState.IDLE
 
     @property
     def progress_ratio(self) -> float:

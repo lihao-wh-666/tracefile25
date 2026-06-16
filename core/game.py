@@ -470,9 +470,9 @@ class Game:
         """检测玩家与道具拾取物的碰撞。"""
         player_rect = self.player.get_rect()
         for pickup in list(self.powerup_pickups):
+            pickup.update()
             if pickup.collected:
                 continue
-            pickup.update()
             rect = pickup.get_rect()
             if player_rect.colliderect(rect):
                 pickup.collected = True
