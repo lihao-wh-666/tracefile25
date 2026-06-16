@@ -769,52 +769,7 @@ class Game:
 
     def _draw_hud(self):
         """绘制抬头显示（HUD）。"""
-        SHADOW_OFFSET = 3
-
-        coin_text = self.font.render(f"金币: {self.score}", True, WHITE)
-        shadow_text = self.font.render(f"金币: {self.score}", True, BLACK)
-        self.screen.blit(shadow_text, (20 + SHADOW_OFFSET, 15 + SHADOW_OFFSET))
-        self.screen.blit(coin_text, (20, 15))
-
-        if self.level_config:
-            level_num = self.current_level + 1
-            level_text = self.font.render(
-                f"第 {level_num}/{TOTAL_LEVELS} 关: {self.level_config.name}",
-                True, WHITE,
-            )
-            level_shadow = self.font.render(
-                f"第 {level_num}/{TOTAL_LEVELS} 关: {self.level_config.name}",
-                True, BLACK,
-            )
-            text_x = (SCREEN_WIDTH - level_text.get_width()) // 2
-            self.screen.blit(level_shadow, (text_x + SHADOW_OFFSET, 15 + SHADOW_OFFSET))
-            self.screen.blit(level_text, (text_x, 15))
-
-        hint = self.font.render(
-            "移动:方向键/WASD  跳跃:空格  攀爬:上下  J:近战  K:射击  R:换弹",
-            True, (50, 50, 80),
-        )
-        self.screen.blit(hint, (SCREEN_WIDTH - hint.get_width() - 15, 15))
-
-        ammo_color = (255, 255, 100) if self.player.ammo > 5 else (255, 80, 80)
-        if self.player.reloading:
-            ammo_color = (150, 150, 150)
-        ammo_text = self.font.render(
-            f"弹药: {self.player.ammo}/{RANGED_AMMO_MAX}",
-            True, ammo_color,
-        )
-        ammo_shadow = self.font.render(
-            f"弹药: {self.player.ammo}/{RANGED_AMMO_MAX}",
-            True, BLACK,
-        )
-        self.screen.blit(ammo_shadow, (20 + SHADOW_OFFSET, 40 + SHADOW_OFFSET))
-        self.screen.blit(ammo_text, (20, 40))
-
-        audio_hint = self.font.render(
-            "[V] 音频设置",
-            True, (80, 80, 120) if not self.volume_panel.visible else (100, 200, 255),
-        )
-        self.screen.blit(audio_hint, (SCREEN_WIDTH - audio_hint.get_width() - 15, 40))
+        self.hud_manager.draw_hud(self.screen, self.font, self.big_font)
 
     def _draw_transition(self):
         """绘制过渡动画遮罩层（淡出/淡入）。"""

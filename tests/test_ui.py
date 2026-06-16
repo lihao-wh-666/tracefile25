@@ -687,3 +687,35 @@ class TestItemIconSystem:
         icon_system.update()
         for icon in icon_system.icons:
             assert icon.transition_progress < 0.5 or icon._prev_available != icon.is_available
+
+    def test_acquire_powerup_updates_availability(self, icon_system, pygame_session):
+        """测试拾取道具后图标状态从不可用变为可用。"""
+        from entities.powerups import PowerupType
+        first_icon = icon_system.icons[0]
+        first_icon.powerup.acquired = False
+        from entities.powerups import PowerupState
+        first_icon.powerup.state = PowerupState.IDLE
+        first_icon._prev_available = False
+        first_icon.transition_progress = 1.0
+        assert first_icon.is_available is False
+
+        icon_system.powerup_manager.acquire_powerup(PowerupType.SPEED_BOOST)
+        assert first_icon.powerup.acquired is True
+        assert first_icon.is_available is True
+
+        icon_system.update()
+        assert first_icon.transition_progress < 1.0 or first_icon._prev_available is True
+
+    def test_use_powerup_triggers_cooldown_state(self, icon_system, pygame_session):
+        """测试使用道具后进入冷却，图标变为不可用。"""
+        from entities.powerups import PowerupType, PowerupState
+        icon_system.powerup_manager.acquire_powerup(PowerupType.SPEED_BOOST)
+        icon_system.powerup_manager.use_powerup(PowerupType.SPEED_BOOST)
+        first_icon = icon_system.icons[0]
+        assert first_icon.powerup.is_active is True
+        assert first_icon.is_available is True
+        for _ in range(1000):
+            icon_system.powerup_manager.update()
+            if first_icon.powerup.is_on_cooldown:
+                break
+        assert first_icon.is_available is False
