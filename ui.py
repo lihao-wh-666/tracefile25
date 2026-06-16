@@ -406,14 +406,21 @@ class ItemIconSystem:
     - 响应式布局适配
     """
 
+    _LABEL_FONT_SIZE = 18
+
     def __init__(self, game, powerup_manager):
         self.game = game
         self.powerup_manager = powerup_manager
         self.icons = []
         self._screen_width = SCREEN_WIDTH
         self._screen_height = SCREEN_HEIGHT
+        self._label_font = None
         self._init_icons()
         self.on_item_used = None
+
+    def _ensure_label_font(self):
+        if self._label_font is None:
+            self._label_font = get_chinese_font(self._LABEL_FONT_SIZE)
 
     def _init_icons(self):
         """初始化道具图标列表。"""
@@ -543,12 +550,13 @@ class ItemIconSystem:
 
     def _draw_icon(self, surface, icon, font):
         """绘制单个道具图标。"""
+        self._ensure_label_font()
+        label_font = self._label_font
+
         size = HUD_POWERUP_ICON_SIZE
         scale = icon.get_effective_scale()
         draw_size = int(size * scale)
         x, y = icon.rect.topleft
-        cx = x + size // 2
-        cy = y + size // 2
 
         main_c, dark_c, glow_c = self._get_colors(icon)
 
@@ -559,7 +567,6 @@ class ItemIconSystem:
             glow_c = self._apply_grayscale(glow_c, alpha)
 
         offset = (size - draw_size) // 2
-        draw_rect = pygame.Rect(x + offset, y + offset, draw_size, draw_size)
 
         if icon.is_available and icon.hovered:
             glow_size = draw_size + 8
@@ -589,7 +596,8 @@ class ItemIconSystem:
         )
 
         if icon.powerup.is_active:
-            pulse = 0.5 + 0.5 * math.sin(self.game.tick * 0.15)
+            tick = self.game.tick if self.game else 0
+            pulse = 0.5 + 0.5 * math.sin(tick * 0.15)
             glow_alpha = int(50 + 30 * pulse)
             active_glow = pygame.Surface((draw_size, draw_size), pygame.SRCALPHA)
             pygame.draw.rect(
@@ -609,7 +617,7 @@ class ItemIconSystem:
 
         p = icon.powerup
         if hasattr(p, 'shield_ratio') or hasattr(p, 'uses_ratio') or p.is_active or p.is_on_cooldown:
-            bar_y = draw_size - HUD_POWERUP_BAR_HEIGHT - 4
+            bar_y = draw_size - HUD_POWERUP_BAR_HEIGHT - 18
             bar_w = draw_size - 8
             if hasattr(p, 'shield_ratio') and p.is_active:
                 ratio = p.shield_ratio
@@ -626,14 +634,26 @@ class ItemIconSystem:
             )
 
         lvl_c = HUD_POWERUP_TEXT_COLOR if icon.is_available else (120, 120, 120)
-        lvl_text = font.render(f"L{p.level}", True, lvl_c)
-        bg_surf.blit(lvl_text, (4, 2))
+        lvl_text = label_font.render(f"L{p.level}", True, lvl_c)
+        bg_surf.blit(lvl_text, (4, draw_size - lvl_text.get_height() - 3))
 
+        key_bg_size = label_font.get_height() + 2
+        key_bg_x = draw_size - key_bg_size - 2
+        key_bg_y = draw_size - key_bg_size - 2
+        if icon.is_available:
+            key_bg_color = (*main_c, 140)
+        else:
+            key_bg_color = (80, 80, 80, 140)
+        pygame.draw.rect(
+            bg_surf, key_bg_color,
+            (key_bg_x, key_bg_y, key_bg_size, key_bg_size),
+            border_radius=3,
+        )
         key_c = (255, 255, 200) if icon.is_available else (120, 120, 120)
-        key_surf = font.render(icon.key_label, True, key_c)
+        key_surf = label_font.render(icon.key_label, True, key_c)
         kw = key_surf.get_width()
         kh = key_surf.get_height()
-        bg_surf.blit(key_surf, (draw_size - kw - 4, draw_size - kh - 4))
+        bg_surf.blit(key_surf, (key_bg_x + (key_bg_size - kw) // 2, key_bg_y + (key_bg_size - kh) // 2))
 
         surface.blit(bg_surf, (x + offset, y + offset))
 

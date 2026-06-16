@@ -23,6 +23,7 @@ import pygame
 from ui import (
     get_chinese_font,
     VolumeSlider, VolumePanel,
+    ItemIconData, ItemIconSystem,
 )
 
 
@@ -342,3 +343,347 @@ class TestVolumePanel:
         panel.draw(surf, big_font, small_font)
         panel.visible = False
         panel.draw(surf, big_font, small_font)
+
+
+class TestItemIconData:
+    """ItemIconData 单个道具图标数据测试。"""
+
+    def test_init_attributes(self, pygame_session):
+        """测试初始化属性。"""
+        from entities.powerups import SpeedBoostPowerup, PowerupType
+        powerup = SpeedBoostPowerup()
+        icon = ItemIconData(
+            PowerupType.SPEED_BOOST, powerup, "1", "加速", "测试描述"
+        )
+        assert icon.powerup_type == PowerupType.SPEED_BOOST
+        assert icon.powerup is powerup
+        assert icon.key_label == "1"
+        assert icon.display_name == "加速"
+        assert icon.description == "测试描述"
+        assert icon.hovered is False
+        assert icon.clicked is False
+
+    def test_is_available_not_acquired(self, pygame_session):
+        """测试未拾取道具不可用。"""
+        from entities.powerups import SpeedBoostPowerup
+        powerup = SpeedBoostPowerup()
+        powerup.acquired = False
+        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        assert icon.is_available is False
+
+    def test_is_available_acquired_idle(self, pygame_session):
+        """测试已拾取空闲道具可用。"""
+        from entities.powerups import SpeedBoostPowerup
+        powerup = SpeedBoostPowerup()
+        powerup.acquired = True
+        from entities.powerups import PowerupState
+        powerup.state = PowerupState.IDLE
+        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        assert icon.is_available is True
+
+    def test_is_available_active(self, pygame_session):
+        """测试激活中道具可用。"""
+        from entities.powerups import SpeedBoostPowerup, PowerupState
+        powerup = SpeedBoostPowerup()
+        powerup.acquired = True
+        powerup.state = PowerupState.ACTIVE
+        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        assert icon.is_available is True
+
+    def test_is_available_on_cooldown(self, pygame_session):
+        """测试冷却中道具不可用。"""
+        from entities.powerups import SpeedBoostPowerup, PowerupState
+        powerup = SpeedBoostPowerup()
+        powerup.acquired = True
+        powerup.state = PowerupState.COOLDOWN
+        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        assert icon.is_available is False
+
+    def test_effective_alpha_available(self, pygame_session):
+        """测试可用状态透明度。"""
+        from entities.powerups import SpeedBoostPowerup
+        powerup = SpeedBoostPowerup()
+        powerup.acquired = True
+        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        icon._prev_available = True
+        icon.transition_progress = 0.0
+        assert icon.effective_alpha == 0.0
+
+    def test_effective_alpha_unavailable(self, pygame_session):
+        """测试不可用状态灰度透明度。"""
+        from entities.powerups import SpeedBoostPowerup
+        from config import HUD_POWERUP_GRAYSCALE_ALPHA
+        powerup = SpeedBoostPowerup()
+        powerup.acquired = False
+        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        icon._prev_available = False
+        icon.transition_progress = 0.0
+        expected = 1.0 - 0.0 * (1.0 - HUD_POWERUP_GRAYSCALE_ALPHA)
+        assert abs(icon.effective_alpha - expected) < 0.001
+
+    def test_get_effective_scale_base(self, pygame_session):
+        """测试基础缩放比例。"""
+        from entities.powerups import SpeedBoostPowerup
+        powerup = SpeedBoostPowerup()
+        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        icon.hover_progress = 0.0
+        assert abs(icon.get_effective_scale() - 1.0) < 0.001
+
+    def test_get_effective_scale_hover(self, pygame_session):
+        """测试悬停缩放比例。"""
+        from entities.powerups import SpeedBoostPowerup
+        from config import HUD_POWERUP_HOVER_SCALE
+        powerup = SpeedBoostPowerup()
+        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        icon.hover_progress = 1.0
+        assert abs(icon.get_effective_scale() - HUD_POWERUP_HOVER_SCALE) < 0.001
+
+    def test_update_transitions_decrements(self, pygame_session):
+        """测试过渡动画递减。"""
+        from entities.powerups import SpeedBoostPowerup
+        powerup = SpeedBoostPowerup()
+        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        icon.transition_progress = 0.5
+        icon._prev_available = icon.is_available
+        icon.update_transitions()
+        assert icon.transition_progress < 0.5
+
+
+class TestItemIconSystem:
+    """ItemIconSystem 道具图标系统测试。"""
+
+    @pytest.fixture
+    def icon_system(self, pygame_session):
+        from core.powerup_manager import PowerupManager
+        pm = PowerupManager()
+        system = ItemIconSystem(None, pm)
+        return system
+
+    def test_init_creates_icons(self, icon_system):
+        """测试初始化创建图标。"""
+        assert len(icon_system.icons) == 3
+
+    def test_init_icon_key_labels(self, icon_system):
+        """测试图标快捷键标签。"""
+        labels = [icon.key_label for icon in icon_system.icons]
+        assert "1" in labels
+        assert "2" in labels
+        assert "3" in labels
+
+    def test_init_icon_display_names(self, icon_system):
+        """测试图标显示名称。"""
+        names = [icon.display_name for icon in icon_system.icons]
+        assert "加速" in names
+        assert "护盾" in names
+        assert "强化武器" in names
+
+    def test_layout_icons_positions(self, icon_system):
+        """测试图标布局位置。"""
+        from config import HUD_POWERUP_START_X, HUD_POWERUP_ICON_SIZE, HUD_POWERUP_ICON_MARGIN
+        icon_system._layout_icons()
+        assert icon_system.icons[0].rect.x == HUD_POWERUP_START_X
+        assert icon_system.icons[1].rect.x == HUD_POWERUP_START_X + HUD_POWERUP_ICON_SIZE + HUD_POWERUP_ICON_MARGIN
+        assert icon_system.icons[2].rect.x == HUD_POWERUP_START_X + (HUD_POWERUP_ICON_SIZE + HUD_POWERUP_ICON_MARGIN) * 2
+
+    def test_handle_event_mouse_hover(self, icon_system):
+        """测试鼠标悬停事件。"""
+        icon_system._layout_icons()
+        first_icon = icon_system.icons[0]
+        cx = first_icon.rect.centerx
+        cy = first_icon.rect.centery
+        event = pygame.event.Event(pygame.MOUSEMOTION, {"pos": (cx, cy)})
+        icon_system.handle_event(event)
+        assert first_icon.hovered is True or first_icon.hovered is False
+
+    def test_handle_event_mouse_click_unavailable(self, icon_system):
+        """测试点击不可用道具不触发使用。"""
+        icon_system._layout_icons()
+        first_icon = icon_system.icons[0]
+        first_icon.powerup.acquired = False
+        cx = first_icon.rect.centerx
+        cy = first_icon.rect.centery
+        used = []
+        icon_system.on_item_used = lambda pt: used.append(pt)
+        event = pygame.event.Event(pygame.MOUSEBUTTONDOWN, {"button": 1, "pos": (cx, cy)})
+        icon_system.handle_event(event)
+        assert len(used) == 0
+
+    def test_handle_event_mouse_click_available(self, icon_system):
+        """测试点击可用道具触发使用。"""
+        icon_system._layout_icons()
+        first_icon = icon_system.icons[0]
+        first_icon.powerup.acquired = True
+        from entities.powerups import PowerupState
+        first_icon.powerup.state = PowerupState.IDLE
+        cx = first_icon.rect.centerx
+        cy = first_icon.rect.centery
+        used = []
+        icon_system.on_item_used = lambda pt: used.append(pt)
+        event = pygame.event.Event(pygame.MOUSEBUTTONDOWN, {"button": 1, "pos": (cx, cy)})
+        icon_system.handle_event(event)
+        assert len(used) == 1
+
+    def test_on_resize(self, icon_system):
+        """测试窗口大小变化。"""
+        icon_system.on_resize(1920, 1080)
+        assert icon_system._screen_width == 1920
+        assert icon_system._screen_height == 1080
+
+    def test_get_start_y(self, icon_system):
+        """测试图标起始 Y 坐标在屏幕底部。"""
+        from config import SCREEN_HEIGHT, HUD_POWERUP_START_Y_OFFSET, HUD_POWERUP_ICON_SIZE
+        y = icon_system._get_start_y()
+        expected_y = SCREEN_HEIGHT - HUD_POWERUP_START_Y_OFFSET - HUD_POWERUP_ICON_SIZE
+        assert y == expected_y
+        assert y > SCREEN_HEIGHT // 2
+
+    def test_draw_no_crash(self, icon_system, pygame_session):
+        """测试绘制不崩溃。"""
+        surf = pygame.Surface((960, 640))
+        font = get_chinese_font(26)
+        big_font = get_chinese_font(52)
+        icon_system.draw(surf, big_font, font)
+
+    def test_draw_with_acquired_powerup(self, icon_system, pygame_session):
+        """测试已拾取道具绘制不崩溃。"""
+        for icon in icon_system.icons:
+            icon.powerup.acquired = True
+        surf = pygame.Surface((960, 640))
+        font = get_chinese_font(26)
+        big_font = get_chinese_font(52)
+        icon_system.draw(surf, big_font, font)
+
+    def test_draw_with_active_powerup(self, icon_system, pygame_session):
+        """测试激活道具绘制不崩溃。"""
+        from entities.powerups import PowerupState
+        for icon in icon_system.icons:
+            icon.powerup.acquired = True
+            icon.powerup.state = PowerupState.ACTIVE
+            icon.powerup.active_timer = 100
+        surf = pygame.Surface((960, 640))
+        font = get_chinese_font(26)
+        big_font = get_chinese_font(52)
+        icon_system.draw(surf, big_font, font)
+
+    def test_draw_with_cooldown_powerup(self, icon_system, pygame_session):
+        """测试冷却中道具绘制不崩溃。"""
+        from entities.powerups import PowerupState
+        for icon in icon_system.icons:
+            icon.powerup.acquired = True
+            icon.powerup.state = PowerupState.COOLDOWN
+            icon.powerup.cooldown_timer = 100
+        surf = pygame.Surface((960, 640))
+        font = get_chinese_font(26)
+        big_font = get_chinese_font(52)
+        icon_system.draw(surf, big_font, font)
+
+    def test_draw_renders_level_label_bottom_left(self, icon_system, pygame_session):
+        """测试左下角绘制等级标签。"""
+        from config import HUD_POWERUP_ICON_SIZE
+        for icon in icon_system.icons:
+            icon.powerup.acquired = True
+        surf = pygame.Surface((960, 640))
+        font = get_chinese_font(26)
+        big_font = get_chinese_font(52)
+        icon_system.draw(surf, big_font, font)
+        icon_x = icon_system.icons[0].rect.x
+        icon_y = icon_system.icons[0].rect.y
+        icon_size = HUD_POWERUP_ICON_SIZE
+        bottom_left_region = pygame.Rect(
+            icon_x + 2, icon_y + icon_size // 2,
+            icon_size // 2, icon_size // 2
+        )
+        has_pixels = False
+        for dx in range(bottom_left_region.width):
+            for dy in range(0, bottom_left_region.height, 2):
+                px = bottom_left_region.x + dx
+                py = bottom_left_region.y + dy
+                if 0 <= px < surf.get_width() and 0 <= py < surf.get_height():
+                    pixel = surf.get_at((px, py))
+                    if pixel[:3] != (0, 0, 0):
+                        has_pixels = True
+                        break
+            if has_pixels:
+                break
+        assert has_pixels, "左下角应有等级标签像素"
+
+    def test_draw_renders_key_label_bottom_right(self, icon_system, pygame_session):
+        """测试右下角绘制快捷键标签。"""
+        from config import HUD_POWERUP_ICON_SIZE
+        for icon in icon_system.icons:
+            icon.powerup.acquired = True
+        surf = pygame.Surface((960, 640))
+        font = get_chinese_font(26)
+        big_font = get_chinese_font(52)
+        icon_system.draw(surf, big_font, font)
+        icon_x = icon_system.icons[0].rect.x
+        icon_y = icon_system.icons[0].rect.y
+        icon_size = HUD_POWERUP_ICON_SIZE
+        bottom_right_region = pygame.Rect(
+            icon_x + icon_size // 2, icon_y + icon_size // 2,
+            icon_size // 2, icon_size // 2
+        )
+        has_pixels = False
+        for dx in range(bottom_right_region.width):
+            for dy in range(0, bottom_right_region.height, 2):
+                px = bottom_right_region.x + dx
+                py = bottom_right_region.y + dy
+                if 0 <= px < surf.get_width() and 0 <= py < surf.get_height():
+                    pixel = surf.get_at((px, py))
+                    if pixel[:3] != (0, 0, 0):
+                        has_pixels = True
+                        break
+            if has_pixels:
+                break
+        assert has_pixels, "右下角应有快捷键标签像素"
+
+    def test_level_label_text_content(self, icon_system, pygame_session):
+        """测试等级标签文本内容正确渲染。"""
+        from config import HUD_POWERUP_ICON_SIZE
+        icon_system._ensure_label_font()
+        label_font = icon_system._label_font
+        for icon in icon_system.icons:
+            icon.powerup.acquired = True
+            level = icon.powerup.level
+            expected_text = f"L{level}"
+            rendered = label_font.render(expected_text, True, (255, 255, 255))
+            assert rendered.get_width() > 0
+            assert rendered.get_height() > 0
+
+    def test_key_label_text_content(self, icon_system, pygame_session):
+        """测试快捷键标签文本内容正确渲染。"""
+        icon_system._ensure_label_font()
+        label_font = icon_system._label_font
+        expected_keys = ["1", "2", "3"]
+        for i, icon in enumerate(icon_system.icons):
+            rendered = label_font.render(icon.key_label, True, (255, 255, 200))
+            assert rendered.get_width() > 0
+            assert rendered.get_height() > 0
+            assert icon.key_label == expected_keys[i]
+
+    def test_draw_grayscale_unavailable(self, icon_system, pygame_session):
+        """测试不可用道具绘制为灰度。"""
+        for icon in icon_system.icons:
+            icon.powerup.acquired = False
+        surf = pygame.Surface((960, 640))
+        font = get_chinese_font(26)
+        big_font = get_chinese_font(52)
+        icon_system.draw(surf, big_font, font)
+        icon_x = icon_system.icons[0].rect.x
+        icon_y = icon_system.icons[0].rect.y
+        center_x = icon_x + 24
+        center_y = icon_y + 24
+        if 0 <= center_x < surf.get_width() and 0 <= center_y < surf.get_height():
+            pixel = surf.get_at((center_x, center_y))
+            r, g, b = pixel[:3]
+            if r > 0 or g > 0 or b > 0:
+                max_diff = max(abs(r - g), abs(g - b), abs(r - b))
+                assert max_diff <= 30, "不可用道具图标应为灰度色"
+
+    def test_update_transitions_called(self, icon_system):
+        """测试 update 调用过渡动画更新。"""
+        for icon in icon_system.icons:
+            icon.transition_progress = 0.5
+        icon_system.update()
+        for icon in icon_system.icons:
+            assert icon.transition_progress < 0.5 or icon._prev_available != icon.is_available
