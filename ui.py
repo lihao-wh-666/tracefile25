@@ -346,9 +346,9 @@ class VolumePanel:
 class ItemIconData:
     """单个道具图标数据。"""
 
-    def __init__(self, powerup_type, powerup, key_label, display_name, description):
+    def __init__(self, powerup_type, powerup_manager, key_label, display_name, description):
         self.powerup_type = powerup_type
-        self.powerup = powerup
+        self.powerup_manager = powerup_manager
         self.key_label = key_label
         self.display_name = display_name
         self.description = description
@@ -359,6 +359,10 @@ class ItemIconData:
         self.hovered = False
         self.clicked = False
         self.pulse_phase = 0.0
+
+    @property
+    def powerup(self):
+        return self.powerup_manager.get_powerup(self.powerup_type)
 
     def update_transitions(self):
         """更新过渡动画状态。"""
@@ -437,9 +441,8 @@ class ItemIconSystem:
 
         self.icons = []
         for ptype, key, name, desc in icon_info:
-            powerup = self.powerup_manager.get_powerup(ptype)
-            icon = ItemIconData(ptype, powerup, key, name, desc)
-            icon._prev_available = powerup.can_activate or powerup.is_active
+            icon = ItemIconData(ptype, self.powerup_manager, key, name, desc)
+            icon._prev_available = icon.powerup.can_activate or icon.powerup.is_active
             self.icons.append(icon)
 
     def on_resize(self, width, height):

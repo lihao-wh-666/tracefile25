@@ -348,15 +348,23 @@ class TestVolumePanel:
 class TestItemIconData:
     """ItemIconData 单个道具图标数据测试。"""
 
+    @pytest.fixture
+    def icon_data_fix(self, pygame_session):
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType
+        pm = PowerupManager()
+        return pm, PowerupType.SPEED_BOOST
+
     def test_init_attributes(self, pygame_session):
         """测试初始化属性。"""
-        from entities.powerups import SpeedBoostPowerup, PowerupType
-        powerup = SpeedBoostPowerup()
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType
+        pm = PowerupManager()
         icon = ItemIconData(
-            PowerupType.SPEED_BOOST, powerup, "1", "加速", "测试描述"
+            PowerupType.SPEED_BOOST, pm, "1", "加速", "测试描述"
         )
         assert icon.powerup_type == PowerupType.SPEED_BOOST
-        assert icon.powerup is powerup
+        assert icon.powerup_manager is pm
         assert icon.key_label == "1"
         assert icon.display_name == "加速"
         assert icon.description == "测试描述"
@@ -365,57 +373,63 @@ class TestItemIconData:
 
     def test_is_available_not_acquired(self, pygame_session):
         """测试未拾取道具不可用。"""
-        from entities.powerups import SpeedBoostPowerup
-        powerup = SpeedBoostPowerup()
-        powerup.acquired = False
-        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType
+        pm = PowerupManager()
+        pm.get_powerup(PowerupType.SPEED_BOOST).acquired = False
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
         assert icon.is_available is False
 
     def test_is_available_acquired_idle(self, pygame_session):
         """测试已拾取空闲道具可用。"""
-        from entities.powerups import SpeedBoostPowerup
-        powerup = SpeedBoostPowerup()
-        powerup.acquired = True
-        from entities.powerups import PowerupState
-        powerup.state = PowerupState.IDLE
-        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType, PowerupState
+        pm = PowerupManager()
+        pm.acquire_powerup(PowerupType.SPEED_BOOST)
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
         assert icon.is_available is True
 
     def test_is_available_active(self, pygame_session):
         """测试激活中道具可用。"""
-        from entities.powerups import SpeedBoostPowerup, PowerupState
-        powerup = SpeedBoostPowerup()
-        powerup.acquired = True
-        powerup.state = PowerupState.ACTIVE
-        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType, PowerupState
+        pm = PowerupManager()
+        pm.acquire_powerup(PowerupType.SPEED_BOOST)
+        pm.use_powerup(PowerupType.SPEED_BOOST)
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
         assert icon.is_available is True
 
     def test_is_available_on_cooldown(self, pygame_session):
         """测试冷却中道具不可用。"""
-        from entities.powerups import SpeedBoostPowerup, PowerupState
-        powerup = SpeedBoostPowerup()
-        powerup.acquired = True
-        powerup.state = PowerupState.COOLDOWN
-        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType, PowerupState
+        pm = PowerupManager()
+        pm.acquire_powerup(PowerupType.SPEED_BOOST)
+        pm.use_powerup(PowerupType.SPEED_BOOST)
+        p = pm.get_powerup(PowerupType.SPEED_BOOST)
+        p.state = PowerupState.COOLDOWN
+        p.cooldown_timer = 100
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
         assert icon.is_available is False
 
     def test_effective_alpha_available(self, pygame_session):
         """测试可用状态透明度。"""
-        from entities.powerups import SpeedBoostPowerup
-        powerup = SpeedBoostPowerup()
-        powerup.acquired = True
-        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType
+        pm = PowerupManager()
+        pm.acquire_powerup(PowerupType.SPEED_BOOST)
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
         icon._prev_available = True
         icon.transition_progress = 0.0
         assert icon.effective_alpha == 0.0
 
     def test_effective_alpha_unavailable(self, pygame_session):
         """测试不可用状态灰度透明度。"""
-        from entities.powerups import SpeedBoostPowerup
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType
         from config import HUD_POWERUP_GRAYSCALE_ALPHA
-        powerup = SpeedBoostPowerup()
-        powerup.acquired = False
-        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        pm = PowerupManager()
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
         icon._prev_available = False
         icon.transition_progress = 0.0
         expected = 1.0 - 0.0 * (1.0 - HUD_POWERUP_GRAYSCALE_ALPHA)
@@ -423,30 +437,47 @@ class TestItemIconData:
 
     def test_get_effective_scale_base(self, pygame_session):
         """测试基础缩放比例。"""
-        from entities.powerups import SpeedBoostPowerup
-        powerup = SpeedBoostPowerup()
-        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType
+        pm = PowerupManager()
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
         icon.hover_progress = 0.0
         assert abs(icon.get_effective_scale() - 1.0) < 0.001
 
     def test_get_effective_scale_hover(self, pygame_session):
         """测试悬停缩放比例。"""
-        from entities.powerups import SpeedBoostPowerup
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType
         from config import HUD_POWERUP_HOVER_SCALE
-        powerup = SpeedBoostPowerup()
-        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        pm = PowerupManager()
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
         icon.hover_progress = 1.0
         assert abs(icon.get_effective_scale() - HUD_POWERUP_HOVER_SCALE) < 0.001
 
     def test_update_transitions_decrements(self, pygame_session):
         """测试过渡动画递减。"""
-        from entities.powerups import SpeedBoostPowerup
-        powerup = SpeedBoostPowerup()
-        icon = ItemIconData("speed_boost", powerup, "1", "加速", "")
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType
+        pm = PowerupManager()
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
         icon.transition_progress = 0.5
         icon._prev_available = icon.is_available
         icon.update_transitions()
         assert icon.transition_progress < 0.5
+
+    def test_powerup_property_follows_manager(self, pygame_session):
+        """测试 powerup 属性跟随管理器对象替换。"""
+        from core.powerup_manager import PowerupManager
+        from entities.powerups import PowerupType, SpeedBoostPowerup
+        pm = PowerupManager()
+        icon = ItemIconData(PowerupType.SPEED_BOOST, pm, "1", "加速", "")
+        old_ref = icon.powerup
+        new_powerup = SpeedBoostPowerup()
+        new_powerup.acquired = True
+        pm._inventory[PowerupType.SPEED_BOOST] = new_powerup
+        assert icon.powerup is new_powerup
+        assert icon.powerup is not old_ref
+        assert icon.is_available is True
 
 
 class TestItemIconSystem:
