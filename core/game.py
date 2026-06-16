@@ -885,6 +885,7 @@ class Game:
 
             if self.game_state == GameState.PLAYING:
                 self.volume_panel.handle_event(event)
+                self.hud_manager.handle_event(event)
         return True
 
     def _update_world(self, keys):
@@ -895,6 +896,7 @@ class Game:
         self.player.update(keys, self.platforms, self.ladders)
 
         self.powerup_manager.update()
+        self.hud_manager.update()
 
         if self.player.died:
             final_score = self.score

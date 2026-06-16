@@ -10,7 +10,7 @@ import math
 import pygame
 
 from config import (
-    SCREEN_WIDTH,
+    SCREEN_WIDTH, SCREEN_HEIGHT,
     WHITE, BLACK,
     COIN_COLLECT_SCORE,
     TOTAL_LEVELS,
@@ -19,7 +19,7 @@ from config import (
     HUD_POWERUP_ICON_SIZE,
     HUD_POWERUP_ICON_MARGIN,
     HUD_POWERUP_START_X,
-    HUD_POWERUP_START_Y,
+    HUD_POWERUP_START_Y_OFFSET,
     HUD_POWERUP_BAR_HEIGHT,
     HUD_POWERUP_BAR_BG,
     HUD_POWERUP_TEXT_COLOR,
@@ -28,6 +28,7 @@ from config import (
     WEAPON_COLOR, WEAPON_DARK, WEAPON_GLOW,
 )
 
+from ui import ItemIconSystem
 from entities.powerups import (
     PowerupType,
     PowerupState,
@@ -52,6 +53,24 @@ class HUDManager:
 
     def __init__(self, game):
         self.game = game
+        self.item_icon_system = ItemIconSystem(game, game.powerup_manager)
+        self.item_icon_system.on_item_used = self._on_item_used
+
+    def _on_item_used(self, powerup_type):
+        """道具被使用时的回调。"""
+        pass
+
+    def handle_event(self, event):
+        """处理鼠标事件，传递给道具图标系统。"""
+        return self.item_icon_system.handle_event(event)
+
+    def update(self):
+        """更新 HUD 状态。"""
+        self.item_icon_system.update()
+
+    def on_resize(self, width, height):
+        """响应屏幕尺寸变化。"""
+        self.item_icon_system.on_resize(width, height)
 
     def draw_hud(self, screen, font, big_font):
         """绘制抬头显示（HUD）。"""
@@ -102,7 +121,7 @@ class HUDManager:
         )
         screen.blit(audio_hint, (SCREEN_WIDTH - audio_hint.get_width() - 15, 40))
 
-        self._draw_powerup_status(screen, font)
+        self.item_icon_system.draw(screen, big_font, font)
         self._draw_powerup_notification(screen, big_font, font)
 
     def _draw_powerup_status(self, screen, font):
