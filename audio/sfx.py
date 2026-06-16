@@ -135,6 +135,93 @@ def _make_sfx_level_complete():
     return generate_melody(notes, tempo=160, volume=0.45, waveform="square")
 
 
+def _make_sfx_powerup_pickup():
+    """生成道具拾取音效：上升音阶 + 和弦。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["E5"], 0.05), (nf["G5"], 0.05), (nf["C6"], 0.05), (nf["E6"], 0.12),
+    ]
+    mel = generate_melody(notes, tempo=200, volume=0.4, waveform="square")
+    chord = generate_chord(
+        [nf["C5"], nf["E5"], nf["G5"]], 0.0, 0.2, decay=8.0
+    )
+    return mel + chord
+
+
+def _make_sfx_speed_boost_activate():
+    """生成加速道具激活音效：呼啸感上升音阶。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["D5"], 0.04), (nf["F5"], 0.04), (nf["A5"], 0.04), (nf["D6"], 0.1),
+    ]
+    return generate_melody(notes, tempo=220, volume=0.4, waveform="sawtooth")
+
+
+def _make_sfx_shield_activate():
+    """生成护盾道具激活音效：厚重和弦。"""
+    nf = NOTE_FREQ
+    return generate_chord(
+        [nf["C4"], nf["G4"], nf["C5"], nf["E5"]], 0.0, 0.3, decay=6.0
+    )
+
+
+def _make_sfx_weapon_activate():
+    """生成武器道具激活音效：铿锵感。"""
+    nf = NOTE_FREQ
+    data1 = generate_tone(
+        nf["E5"], 0.06, 0.45, waveform="square", decay=15.0
+    )
+    data2 = generate_tone(
+        nf["B5"], 0.08, 0.4, waveform="square", decay=20.0
+    )
+    return data1 + data2
+
+
+def _make_sfx_weapon_switch():
+    """生成武器切换音效。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["G4"], 0.04), (nf["C5"], 0.04),
+    ]
+    return generate_melody(notes, tempo=200, volume=0.35, waveform="triangle")
+
+
+def _make_sfx_powerup_deactivate():
+    """生成道具失效音效：下降音阶。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["E5"], 0.06), (nf["C5"], 0.08), (nf["G4"], 0.1),
+    ]
+    return generate_melody(notes, tempo=160, volume=0.35, waveform="sawtooth")
+
+
+def _make_sfx_powerup_upgrade():
+    """生成道具升级音效：华丽的上升旋律。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["C5"], 0.06), (nf["E5"], 0.06), (nf["G5"], 0.06),
+        (nf["C6"], 0.08), (nf["E6"], 0.1), (nf["G6"], 0.15),
+    ]
+    return generate_melody(notes, tempo=180, volume=0.45, waveform="square")
+
+
+def _make_sfx_shield_hit():
+    """生成护盾受击音效：沉闷格挡声。"""
+    nf = NOTE_FREQ
+    return generate_tone(
+        nf["C3"], 0.1, 0.45, waveform="square", decay=12.0
+    )
+
+
+def _make_sfx_weapon_consume():
+    """生成强化武器消耗一次使用的音效。"""
+    nf = NOTE_FREQ
+    notes = [
+        (nf["A4"], 0.03), (nf["E5"], 0.05),
+    ]
+    return generate_melody(notes, tempo=240, volume=0.4, waveform="sawtooth")
+
+
 SFX_GENERATORS = {
     "jump": _make_sfx_jump,
     "double_jump": _make_sfx_double_jump,
@@ -150,6 +237,15 @@ SFX_GENERATORS = {
     "enemy_hit": _make_sfx_enemy_hit,
     "reload": _make_sfx_reload,
     "ammo_pickup": _make_sfx_ammo_pickup,
+    "powerup_pickup": _make_sfx_powerup_pickup,
+    "speed_boost_activate": _make_sfx_speed_boost_activate,
+    "shield_activate": _make_sfx_shield_activate,
+    "weapon_activate": _make_sfx_weapon_activate,
+    "weapon_switch": _make_sfx_weapon_switch,
+    "powerup_deactivate": _make_sfx_powerup_deactivate,
+    "powerup_upgrade": _make_sfx_powerup_upgrade,
+    "shield_hit": _make_sfx_shield_hit,
+    "weapon_consume": _make_sfx_weapon_consume,
 }
 
 

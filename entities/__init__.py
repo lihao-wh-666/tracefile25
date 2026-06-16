@@ -11,6 +11,17 @@ from .world import Platform, Ladder, Portal
 from .enemies import PatrolEnemy, ChaseEnemy
 from .combat import Bullet
 from .player import Player
+from .powerups import (
+    PowerupBase,
+    PowerupType,
+    PowerupState,
+    SpeedBoostPowerup,
+    ShieldPowerup,
+    WeaponPowerup,
+    PowerupPickup,
+    create_powerup_from_type,
+    create_powerup_from_dict,
+)
 
 __all__ = [
     "BaseEntity",
@@ -26,4 +37,13 @@ __all__ = [
     "ChaseEnemy",
     "Bullet",
     "Player",
+    "PowerupBase",
+    "PowerupType",
+    "PowerupState",
+    "SpeedBoostPowerup",
+    "ShieldPowerup",
+    "WeaponPowerup",
+    "PowerupPickup",
+    "create_powerup_from_type",
+    "create_powerup_from_dict",
 ]

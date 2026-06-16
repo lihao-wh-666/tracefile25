@@ -44,6 +44,15 @@ class AudioManager:
     SFX_ENEMY_HIT = "enemy_hit"
     SFX_RELOAD = "reload"
     SFX_AMMO_PICKUP = "ammo_pickup"
+    SFX_POWERUP_PICKUP = "powerup_pickup"
+    SFX_SPEED_BOOST_ACTIVATE = "speed_boost_activate"
+    SFX_SHIELD_ACTIVATE = "shield_activate"
+    SFX_WEAPON_ACTIVATE = "weapon_activate"
+    SFX_WEAPON_SWITCH = "weapon_switch"
+    SFX_POWERUP_DEACTIVATE = "powerup_deactivate"
+    SFX_POWERUP_UPGRADE = "powerup_upgrade"
+    SFX_SHIELD_HIT = "shield_hit"
+    SFX_WEAPON_CONSUME = "weapon_consume"
 
     def __init__(self):
         self.enabled = False
@@ -115,6 +124,15 @@ class AudioManager:
             self.SFX_ENEMY_HIT,
             self.SFX_RELOAD,
             self.SFX_AMMO_PICKUP,
+            self.SFX_POWERUP_PICKUP,
+            self.SFX_SPEED_BOOST_ACTIVATE,
+            self.SFX_SHIELD_ACTIVATE,
+            self.SFX_WEAPON_ACTIVATE,
+            self.SFX_WEAPON_SWITCH,
+            self.SFX_POWERUP_DEACTIVATE,
+            self.SFX_POWERUP_UPGRADE,
+            self.SFX_SHIELD_HIT,
+            self.SFX_WEAPON_CONSUME,
         ]
 
         for name in sfx_names:

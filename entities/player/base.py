@@ -3,6 +3,7 @@
 entities/player/base.py - 玩家基类模块
 
 定义玩家角色的基础属性和接口。
+扩展支持道具系统集成：加速、护盾、武器强化。
 """
 
 import pygame
@@ -40,6 +41,7 @@ class PlayerBase:
     - 视觉：挤压拉伸、跑步动画、攀爬动画、随机眨眼
     - 碰撞：水平/垂直分离解析，防止穿墙
     - 音频回调：跳跃、落地、多段跳、死亡事件触发
+    - 道具：加速、护盾、武器强化效果集成
     """
 
     def __init__(self, x, y):
@@ -102,6 +104,89 @@ class PlayerBase:
         self.muzzle_flash_timer = 0
 
         self.weapon_state = "none"
+
+        self.invulnerable = False
+        self.invuln_timer = 0
+
+        self.powerup_manager = None
+
+        self.on_shield_hit = None
+        self.on_weapon_consume = None
+        self.on_speed_trail = None
+
+    def set_powerup_manager(self, pm):
+        """设置道具管理器引用。"""
+        self.powerup_manager = pm
+
+    def get_effective_move_speed(self) -> float:
+        """获取应用加速道具后的实际移动速度上限。"""
+        base = MOVE_SPEED
+        if self.powerup_manager is not None:
+            sb = self.powerup_manager.speed_boost()
+            base = sb.get_effective_speed(base)
+        return base
+
+    def get_effective_melee_damage(self, base: int) -> int:
+        """获取应用武器强化后的近战伤害。"""
+        if self.powerup_manager is not None:
+            wp = self.powerup_manager.weapon()
+            return wp.get_modified_melee_damage(base)
+        return base
+
+    def get_effective_ranged_damage(self, base: int) -> int:
+        """获取应用武器强化后的远程伤害。"""
+        if self.powerup_manager is not None:
+            wp = self.powerup_manager.weapon()
+            return wp.get_modified_ranged_damage(base)
+        return base
+
+    def get_effective_cooldown(self, base_frames: int, is_melee: bool) -> int:
+        """获取应用武器强化后的攻击冷却帧数。"""
+        if self.powerup_manager is not None:
+            wp = self.powerup_manager.weapon()
+            return wp.get_modified_attack_cooldown(base_frames, is_melee)
+        return base_frames
+
+    def apply_shield_absorption(self, damage: int) -> int:
+        """
+        尝试用护盾吸收伤害。
+
+        Returns:
+            int: 未被吸收、需要玩家承受伤值
+        """
+        if self.powerup_manager is not None:
+            sh = self.powerup_manager.shield()
+            before = sh.shield_value
+            remaining = sh.absorb_damage(damage)
+            if before != sh.shield_value and self.on_shield_hit:
+                self.on_shield_hit()
+            return remaining
+        return damage
+
+    def consume_weapon_use(self) -> bool:
+        """尝试消耗一次武器强化使用次数。"""
+        if self.powerup_manager is not None:
+            wp = self.powerup_manager.weapon()
+            used = wp.consume_use()
+            if used and self.on_weapon_consume:
+                self.on_weapon_consume()
+            return used
+        return False
+
+    def is_weapon_enhanced(self) -> bool:
+        """当前攻击是否应被武器道具强化。"""
+        if self.powerup_manager is None:
+            return False
+        wp = self.powerup_manager.weapon()
+        return wp.is_active or wp.is_on_cooldown
+
+    def tick_speed_trail(self):
+        """在加速激活时，周期性生成拖尾粒子。"""
+        if self.powerup_manager is None:
+            return
+        sb = self.powerup_manager.speed_boost()
+        if sb.is_active and self.on_speed_trail:
+            self.on_speed_trail()
 
     def get_rect(self):
         """返回玩家碰撞矩形。"""

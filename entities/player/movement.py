@@ -220,13 +220,16 @@ class PlayerMovementMixin:
             move_x = 1
             self.facing_right = True
 
+        effective_speed = self.get_effective_move_speed()
         if move_x != 0:
             self.vx += move_x * ACCELERATION
-            self.vx = max(-MOVE_SPEED, min(MOVE_SPEED, self.vx))
+            self.vx = max(-effective_speed, min(effective_speed, self.vx))
         else:
             self.vx *= FRICTION
             if abs(self.vx) < 0.1:
                 self.vx = 0
+
+        self.tick_speed_trail()
 
         if move_x != 0 and self.on_ground:
             self.run_anim += RUN_ANIM_SPEED

@@ -27,6 +27,7 @@ from .hud import HUDManager
 from .particles import ParticleManager
 from .combat import CombatManager
 from .game import Game
+from .powerup_manager import PowerupManager
 from .save_load import (
     saveData,
     loadData,
@@ -52,6 +53,7 @@ __all__ = [
     "HUDManager",
     "ParticleManager",
     "CombatManager",
+    "PowerupManager",
     "Game",
     "saveData",
     "loadData",

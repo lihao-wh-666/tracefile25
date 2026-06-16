@@ -10,6 +10,8 @@ import math
 import random
 import pygame
 
+import config as _config_module
+
 from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT, FPS, HEADLESS, HEALTHCHECK,
     HEALTHCHECK_MAX_FRAMES,
@@ -29,9 +31,15 @@ from config import (
     SHOW_VOLUME_PANEL_KEY,
     RANGED_AMMO_MAX,
     PORTAL_COOLDOWN_FRAMES,
+    SPEED_BOOST_TRAIL_COLORS,
+    SHIELD_PARTICLE_COLORS, WEAPON_SPARK_COLORS,
 )
 
-from entities import Player, Particle, Coin, Platform, Ladder, Portal, PatrolEnemy, ChaseEnemy, Bullet, AmmoPickup
+from entities import (
+    Player, Particle, Coin, Platform, Ladder, Portal, PatrolEnemy,
+    ChaseEnemy, Bullet, AmmoPickup,
+    PowerupPickup, PowerupType,
+)
 from levels import get_level_config, LEVEL_BUILDERS
 from audio import AudioManager
 from ui import VolumePanel
@@ -43,6 +51,7 @@ from .background import BackgroundManager
 from .hud import HUDManager
 from .particles import ParticleManager
 from .combat import CombatManager
+from .powerup_manager import PowerupManager
 
 
 class Game:
@@ -96,6 +105,7 @@ class Game:
         self.chase_enemies = []
         self.bullets = []
         self.ammo_pickups = []
+        self.powerup_pickups = []
 
         self.current_level = 0
         self.game_state = GameState.LOADING
@@ -108,6 +118,8 @@ class Game:
         self.loading_progress = 0.0
 
         self.player = Player(PLAYER_SPAWN_X, PLAYER_SPAWN_Y)
+        self.powerup_manager = PowerupManager(self)
+        self.player.set_powerup_manager(self.powerup_manager)
         self.font = get_chinese_font(26)
         self.big_font = get_chinese_font(52)
         self.title_font = get_chinese_font(72)
@@ -132,11 +144,14 @@ class Game:
         self.combat_manager = CombatManager(self)
 
         self._bind_player_audio_callbacks()
+        self._bind_powerup_callbacks()
 
         self.menu_manager = MenuManager(self)
         self.game_state = GameState.MAIN_MENU
 
         self._load_level(0, PLAYER_SPAWN_X, PLAYER_SPAWN_Y, immediate=True)
+
+        self.powerup_manager.load_from_file()
 
     def _bind_player_audio_callbacks(self):
         """为玩家对象绑定音频事件回调。"""
@@ -150,6 +165,88 @@ class Game:
         self.player.on_ranged_shot = lambda: self.audio.play_sfx(AudioManager.SFX_RANGED_SHOT)
         self.player.on_reload = lambda: self.audio.play_sfx(AudioManager.SFX_RELOAD)
         self.player.on_ammo_pickup = lambda: self.audio.play_sfx(AudioManager.SFX_AMMO_PICKUP)
+        self.player.on_shield_hit = self._on_shield_hit
+        self.player.on_weapon_consume = self._on_weapon_consume
+        self.player.on_speed_trail = self._on_speed_trail
+
+    def _bind_powerup_callbacks(self):
+        """绑定道具管理器的激活/失效/升级/收集等回调。"""
+        pm = self.powerup_manager
+
+        def on_speed_activate():
+            self.audio.play_sfx(AudioManager.SFX_SPEED_BOOST_ACTIVATE)
+            self._spawn_particles(self.player.x + self.player.width / 2,
+                                  self.player.y + self.player.height / 2,
+                                  count=16, colors=SPEED_BOOST_TRAIL_COLORS,
+                                  spread=6, life=35, size=4)
+
+        def on_speed_deactivate():
+            self.audio.play_sfx(AudioManager.SFX_POWERUP_DEACTIVATE)
+
+        def on_shield_activate():
+            self.audio.play_sfx(AudioManager.SFX_SHIELD_ACTIVATE)
+            self._spawn_particles(self.player.x + self.player.width / 2,
+                                  self.player.y + self.player.height / 2,
+                                  count=20, colors=SHIELD_PARTICLE_COLORS,
+                                  spread=10, life=50, size=5)
+
+        def on_shield_deactivate():
+            self.audio.play_sfx(AudioManager.SFX_POWERUP_DEACTIVATE)
+            self._spawn_particles(self.player.x + self.player.width / 2,
+                                  self.player.y + self.player.height / 2,
+                                  count=12, colors=SHIELD_PARTICLE_COLORS,
+                                  spread=8, life=30, size=4)
+
+        def on_weapon_activate():
+            self.audio.play_sfx(AudioManager.SFX_WEAPON_ACTIVATE)
+            self._spawn_particles(self.player.x + self.player.width / 2,
+                                  self.player.y + self.player.height / 2,
+                                  count=18, colors=WEAPON_SPARK_COLORS,
+                                  spread=7, life=40, size=4)
+
+        def on_weapon_deactivate():
+            self.audio.play_sfx(AudioManager.SFX_POWERUP_DEACTIVATE)
+
+        def on_weapon_switch():
+            self.audio.play_sfx(AudioManager.SFX_WEAPON_SWITCH)
+
+        def on_any_upgrade(ptype):
+            self.audio.play_sfx(AudioManager.SFX_POWERUP_UPGRADE)
+            self._spawn_particles(self.player.x + self.player.width / 2,
+                                  self.player.y + self.player.height / 2,
+                                  count=30, colors=WEAPON_SPARK_COLORS + SHIELD_PARTICLE_COLORS + SPEED_BOOST_TRAIL_COLORS,
+                                  spread=12, life=60, size=6)
+
+        pm.speed_boost().on_activate = on_speed_activate
+        pm.speed_boost().on_deactivate = on_speed_deactivate
+        pm.shield().on_activate = on_shield_activate
+        pm.shield().on_deactivate = on_shield_deactivate
+        pm.weapon().on_activate = on_weapon_activate
+        pm.weapon().on_deactivate = on_weapon_deactivate
+        pm.weapon().on_switch = on_weapon_switch
+        pm.on_any_upgrade = on_any_upgrade
+
+    def _on_shield_hit(self):
+        """护盾受击反馈。"""
+        self.audio.play_sfx(AudioManager.SFX_SHIELD_HIT)
+        self._spawn_particles(self.player.x + self.player.width / 2,
+                              self.player.y + self.player.height / 2,
+                              count=8, colors=SHIELD_PARTICLE_COLORS,
+                              spread=6, life=20, size=3)
+
+    def _on_weapon_consume(self):
+        """武器强化使用次数消耗反馈。"""
+        self.audio.play_sfx(AudioManager.SFX_WEAPON_CONSUME)
+
+    def _on_speed_trail(self):
+        """加速拖尾粒子（每帧）。"""
+        if self.tick % 3 != 0:
+            return
+        px = self.player.x + self.player.width / 2
+        py = self.player.y + self.player.height / 2
+        dx = -self.player.vx * 0.6
+        self._spawn_particles(px, py + 5, count=1, colors=SPEED_BOOST_TRAIL_COLORS,
+                              spread=2, life=20, size=3, vx=dx, vy=0.3)
 
     def _on_bgm_volume_change(self, volume):
         """背景音乐音量滑块变化回调。"""
@@ -341,8 +438,15 @@ class Game:
                 self._player_hit_by_enemy()
                 return
 
-    def _player_hit_by_enemy(self):
-        """玩家被敌人击中时的处理。"""
+    def _player_hit_by_enemy(self, damage: int = 1):
+        """玩家被敌人击中时的处理，先由护盾吸收。"""
+        remaining = self.player.apply_shield_absorption(damage)
+        if remaining <= 0:
+            return
+
+        if self.player.invulnerable:
+            return
+
         self.player.died = True
         if self.player.on_death:
             self.player.on_death()
@@ -361,6 +465,38 @@ class Game:
             coin.collect_anim = 0
         self.player.died = False
         self.menu_manager.trigger_game_over(final_score)
+
+    def _check_powerup_pickups(self):
+        """检测玩家与道具拾取物的碰撞。"""
+        player_rect = self.player.get_rect()
+        for pickup in list(self.powerup_pickups):
+            if pickup.collected:
+                continue
+            pickup.update()
+            rect = pickup.get_rect()
+            if player_rect.colliderect(rect):
+                pickup.collected = True
+                pickup.collect_anim_started = True
+                self.powerup_manager.collect_pickup(pickup)
+                self.audio.play_sfx(AudioManager.SFX_POWERUP_PICKUP)
+                self._spawn_particles(
+                    pickup.x, pickup.y,
+                    count=14,
+                    colors=pickup.particle_colors(),
+                    spread=5, life=25, size=4,
+                )
+        self.powerup_pickups = [p for p in self.powerup_pickups
+                                if not (p.collected and p.collect_anim_frames <= 0)]
+
+    def _spawn_random_powerup(self, x: float, y: float, force_type=None):
+        """在指定位置随机生成一个道具拾取物（用于敌人死亡掉落）。"""
+        if self.rng.random() < 0.45 or force_type is not None:
+            ptype = force_type
+            if ptype is None:
+                ptype = self.rng.choice([PowerupType.SPEED_BOOST,
+                                         PowerupType.SHIELD,
+                                         PowerupType.WEAPON])
+            self.powerup_pickups.append(PowerupPickup(x, y, ptype))
 
     def _handle_melee_input(self):
         """处理近战攻击输入。"""
@@ -436,7 +572,7 @@ class Game:
                     direction = 1 if self.player.facing_right else -1
                     for enemy in self.patrol_enemies[:]:
                         if hitbox.colliderect(enemy.get_rect()):
-                            killed = enemy.take_damage(MELEE_DAMAGE, direction)
+                            killed = enemy.take_damage(self.player.get_melee_damage(), direction)
                             self.audio.play_sfx(AudioManager.SFX_ENEMY_HIT)
                             self._spawn_particles(
                                 enemy.x + enemy.width / 2,
@@ -477,9 +613,13 @@ class Game:
                                 )
                                 self.patrol_enemies.remove(enemy)
                                 self.score += 20
+                                self._spawn_random_powerup(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                )
                     for enemy in self.chase_enemies[:]:
                         if hitbox.colliderect(enemy.get_rect()):
-                            killed = enemy.take_damage(MELEE_DAMAGE, direction)
+                            killed = enemy.take_damage(self.player.get_melee_damage(), direction)
                             self.audio.play_sfx(AudioManager.SFX_ENEMY_HIT)
                             self._spawn_particles(
                                 enemy.x + enemy.width / 2,
@@ -596,6 +736,10 @@ class Game:
                         )
                         self.chase_enemies.remove(enemy)
                         self.score += 20
+                        self._spawn_random_powerup(
+                            enemy.x + enemy.width / 2,
+                            enemy.y + enemy.height / 2,
+                        )
                     break
 
     def _check_ammo_pickups(self):
@@ -730,6 +874,14 @@ class Game:
                         self._handle_ranged_input()
                     elif event.key == pygame.K_r or key_char == 'r':
                         self.player.start_reload()
+                    elif event.key == pygame.K_1:
+                        self.powerup_manager.use_powerup(PowerupType.SPEED_BOOST)
+                    elif event.key == pygame.K_2:
+                        self.powerup_manager.use_powerup(PowerupType.SHIELD)
+                    elif event.key == pygame.K_3:
+                        self.powerup_manager.use_powerup(PowerupType.WEAPON)
+                    elif event.key == pygame.K_q:
+                        self.powerup_manager.weapon().switch_weapon_type()
 
             if self.game_state == GameState.PLAYING:
                 self.volume_panel.handle_event(event)
@@ -737,8 +889,12 @@ class Game:
 
     def _update_world(self, keys):
         """更新游戏世界状态（逻辑帧）。"""
+        _config_module.FRAME_COUNTER = self.tick
+
         old_on_ground = self.player.on_ground
         self.player.update(keys, self.platforms, self.ladders)
+
+        self.powerup_manager.update()
 
         if self.player.died:
             final_score = self.score
@@ -795,6 +951,7 @@ class Game:
         self._update_bullets()
         self._check_combat_hits()
         self._check_ammo_pickups()
+        self._check_powerup_pickups()
 
         self.particles = [p for p in self.particles if p.life > 0]
         for p in self.particles:
@@ -852,6 +1009,9 @@ class Game:
 
         for ammo in self.ammo_pickups:
             ammo.draw(self.screen, self.camera_x, self.tick)
+
+        for pickup in self.powerup_pickups:
+            pickup.draw(self.screen, self.camera_x)
 
         for bullet in self.bullets:
             bullet.draw(self.screen, self.camera_x)

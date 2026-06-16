@@ -43,6 +43,9 @@ from config import (
     MELEE_SCREEN_SHAKE_FRAMES, MELEE_SCREEN_SHAKE_INTENSITY,
     MELEE_SLASH_ARC_COLOR, MELEE_SLASH_ARC_WIDTH,
     MELEE_SLASH_SPARK_COUNT,
+    SHIELD_COLOR, SHIELD_COLOR_GLOW,
+    SPEED_BOOST_COLOR, WEAPON_COLOR,
+    FRAME_COUNTER,
 )
 
 
@@ -75,6 +78,10 @@ class PlayerDrawingMixin:
         """
         sx = self.x - camera_x
         sy = self.y
+
+        cx_center = sx + self.width / 2
+        cy_center = sy + self.height / 2
+        self._draw_powerup_visuals(surface, cx_center, cy_center)
 
         if self.climbing:
             self.squash_stretch += (
@@ -891,3 +898,74 @@ class PlayerDrawingMixin:
             local_poly = [(int(p[0] - cas_x + local_cx), int(p[1] - cas_y + local_cy)) for p in cas_poly]
             pygame.draw.polygon(casing_surf, (*CASING_COLOR, c_alpha), local_poly)
             surface.blit(casing_surf, (int(cas_x - local_cx), int(cas_y - local_cy)))
+
+    def _draw_powerup_visuals(self, surface, cx, cy):
+        """绘制道具激活的视觉反馈：护盾光圈、加速残影、武器光晕。"""
+        global FRAME_COUNTER
+        fc = FRAME_COUNTER
+
+        if self.powerup_manager is not None:
+            sb = self.powerup_manager.speed_boost()
+            if sb.is_active:
+                alpha = int(120 + 60 * math.sin(fc * 0.3))
+                r = 22 + 2 * math.sin(fc * 0.2)
+                speed_surf = pygame.Surface((int(r * 3), int(r * 3)), pygame.SRCALPHA)
+                s_cx = speed_surf.get_width() // 2
+                s_cy = speed_surf.get_height() // 2
+                for t in range(3):
+                    rr = r - t * 4
+                    if rr <= 0:
+                        continue
+                    ta = int(alpha * (1 - t * 0.3))
+                    pygame.draw.circle(
+                        speed_surf, (*SPEED_BOOST_COLOR, ta // 3),
+                        (s_cx, s_cy), int(rr), 2 + t
+                    )
+                off = -2 if self.vx > 0.1 else (2 if self.vx < -0.1 else 0)
+                surface.blit(speed_surf, (int(cx - s_cx + off), int(cy - s_cy)))
+
+            sh = self.powerup_manager.shield()
+            if sh.is_active and sh.shield_value > 0:
+                ratio = sh.shield_value / max(1, sh.max_shield_value)
+                pulse = 1 + 0.06 * math.sin(fc * 0.2)
+                base_r = 26
+                r = int(base_r * pulse)
+                shield_surf = pygame.Surface((r * 3, r * 3), pygame.SRCALPHA)
+                scx = shield_surf.get_width() // 2
+                scy = shield_surf.get_height() // 2
+                pygame.draw.circle(
+                    shield_surf, (*SHIELD_COLOR_GLOW, int(50 * ratio)),
+                    (scx, scy), r + 4
+                )
+                pygame.draw.circle(
+                    shield_surf, (*SHIELD_COLOR, int(140 * ratio + 60)),
+                    (scx, scy), r, 3
+                )
+                for i in range(3):
+                    ring_r = r - 4 - i * 3
+                    if ring_r <= 0:
+                        break
+                    pygame.draw.circle(
+                        shield_surf, (*SHIELD_COLOR, int(40 * ratio)),
+                        (scx, scy), ring_r, 1
+                    )
+                surface.blit(shield_surf, (int(cx - scx), int(cy - scy)))
+
+            wp = self.powerup_manager.weapon()
+            if wp.is_active:
+                glow = int(60 + 40 * math.sin(fc * 0.4))
+                w_surf = pygame.Surface((self.width + 16, self.height + 16), pygame.SRCALPHA)
+                w_cx = w_surf.get_width() // 2
+                w_cy = w_surf.get_height() // 2
+                for t in range(4):
+                    side = 14 - t * 3
+                    if side <= 0:
+                        continue
+                    wa = int(glow * (1 - t * 0.25))
+                    pygame.draw.rect(
+                        w_surf, (*WEAPON_COLOR, wa),
+                        (w_cx - self.width // 2 - side, w_cy - self.height // 2 - side,
+                         self.width + side * 2, self.height + side * 2),
+                        2, border_radius=4
+                    )
+                surface.blit(w_surf, (int(cx - w_cx), int(cy - w_cy)))
