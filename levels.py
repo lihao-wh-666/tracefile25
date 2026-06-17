@@ -18,13 +18,14 @@ levels.py - 多关卡数据定义模块
 import os
 import json
 
-from config import SCREEN_HEIGHT, SCREEN_WIDTH, PLAYER_SPAWN_X, PLAYER_SPAWN_Y
+from config import SCREEN_HEIGHT, SCREEN_WIDTH, PLAYER_SPAWN_X, PLAYER_SPAWN_Y, _strip_json_comments
 
 
 def _load_levels_config():
     """
     从 levels.json 加载关卡配置。
     
+    支持 // 行注释，方便阅读和修改。
     如果文件不存在或加载失败，返回空列表，
     所有关卡将使用代码中的默认值。
     
@@ -34,8 +35,9 @@ def _load_levels_config():
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "levels.json")
     try:
         with open(config_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data.get("levels", [])
+            raw = f.read()
+        data = json.loads(_strip_json_comments(raw))
+        return data.get("levels", [])
     except (FileNotFoundError, json.JSONDecodeError, IOError):
         return []
 

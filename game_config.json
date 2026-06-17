@@ -1,206 +1,243 @@
 {
+  // ==================== 屏幕与帧率 ====================
   "screen": {
-    "width": 960,
-    "height": 640,
-    "fps": 60
+    "width": 960,           // 游戏窗口宽度（像素）
+    "height": 640,          // 游戏窗口高度（像素）
+    "fps": 60               // 目标帧率，影响游戏整体速度
   },
+
+  // ==================== 关卡全局设置 ====================
   "level": {
-    "width": 3000,
-    "total_levels": 3
+    "width": 3000,          // 每个关卡的总宽度（像素），决定横向滚动范围
+    "total_levels": 3       // 游戏总关卡数
   },
+
+  // ==================== 玩家出生与重生 ====================
   "player": {
-    "spawn_x": 100,
-    "spawn_y": 400,
-    "fall_respawn_y_offset": 100
+    "spawn_x": 100,         // 玩家初始出生 X 坐标
+    "spawn_y": 400,         // 玩家初始出生 Y 坐标
+    "fall_respawn_y_offset": 100  // 掉落重生：超过屏幕底部此偏移量后重生
   },
+
+  // ==================== 物理引擎参数 ====================
   "physics": {
-    "gravity": 0.6,
-    "jump_force": -13.5,
-    "move_speed": 5,
-    "max_fall_speed": 15,
-    "acceleration": 0.8,
-    "friction": 0.82,
-    "jump_buffer_frames": 8,
-    "coyote_time_frames": 6,
-    "short_jump_multiplier": 0.85,
-    "short_jump_threshold": -2,
-    "max_jump_count": 3,
-    "multi_jump_force": -11.0,
-    "multi_jump_interval_frames": 8
+    "gravity": 0.6,              // 重力加速度，越大下落越快
+    "jump_force": -13.5,         // 首段跳跃初始力（负值=向上），绝对值越大跳越高
+    "move_speed": 5,             // 最大水平移动速度
+    "max_fall_speed": 15,        // 最大下落速度，防止无限加速
+    "acceleration": 0.8,         // 水平加速系数，越大起步越快
+    "friction": 0.82,            // 摩擦力系数，越小减速越快（0~1）
+    "jump_buffer_frames": 8,     // 跳跃缓冲帧数：落地前提前按跳跃仍有效
+    "coyote_time_frames": 6,     // 土狼时间帧数：离开平台后仍可跳跃的窗口
+    "short_jump_multiplier": 0.85, // 短跳力度倍率：松开跳跃键后速度乘以此值
+    "short_jump_threshold": -2,  // 短跳判定阈值：垂直速度高于此值时触发短跳
+    "max_jump_count": 3,         // 最大跳跃次数（含首跳），即多段跳上限
+    "multi_jump_force": -11.0,   // 空中跳跃力（二段跳、三段跳），绝对值越大空中跳越高
+    "multi_jump_interval_frames": 8  // 空中跳跃最小间隔帧数，防止连按过快
   },
+
+  // ==================== 梯子参数 ====================
   "ladder": {
-    "width": 24,
-    "climb_speed": 3,
-    "squash_on_climb": 0.9,
-    "rung_spacing": 20
+    "width": 24,            // 梯子宽度（像素）
+    "climb_speed": 3,       // 攀爬速度
+    "squash_on_climb": 0.9, // 攀爬时角色纵向压缩比（<1 变矮）
+    "rung_spacing": 20      // 梯子横档间距（像素）
   },
+
+  // ==================== 金币参数 ====================
   "coin": {
-    "collect_score": 10,
-    "bob_amplitude": 4,
-    "collect_anim_frames": 15
+    "collect_score": 10,       // 每个金币的得分
+    "bob_amplitude": 4,        // 金币浮动动画幅度（像素）
+    "collect_anim_frames": 15  // 收集动画持续帧数
   },
+
+  // ==================== 传送门参数 ====================
   "portal": {
-    "width": 60,
-    "height": 90,
-    "activation_coins": 0,
-    "cooldown_frames": 60
+    "width": 60,               // 传送门宽度（像素）
+    "height": 90,              // 传送门高度（像素）
+    "activation_coins": 0,     // 激活传送门所需金币数（0=无需金币）
+    "cooldown_frames": 60      // 传送冷却帧数，防止连续传送
   },
+
+  // ==================== 关卡过渡动画 ====================
   "transition": {
-    "duration_frames": 45,
-    "loading_bar_width": 400,
-    "loading_bar_height": 20
+    "duration_frames": 45,     // 过渡动画总帧数
+    "loading_bar_width": 400,  // 加载条宽度（像素）
+    "loading_bar_height": 20   // 加载条高度（像素）
   },
+
+  // ==================== 敌人参数 ====================
   "enemies": {
     "patrol": {
-      "width": 32,
-      "height": 32,
-      "speed": 1.5,
-      "detection_range": 150,
-      "alert_speed_multiplier": 1.8,
-      "hp": 3
+      "width": 32,                    // 巡逻怪宽度（像素）
+      "height": 32,                   // 巡逻怪高度（像素）
+      "speed": 1.5,                   // 巡逻移动速度
+      "detection_range": 150,         // 发现玩家的检测距离（像素）
+      "alert_speed_multiplier": 1.8,  // 警戒状态速度倍率（发现玩家后加速）
+      "hp": 3                         // 巡逻怪生命值
     },
     "chase": {
-      "width": 28,
-      "height": 36,
-      "speed": 2.5,
-      "chase_range": 200,
-      "give_up_range": 280,
-      "hp": 2
+      "width": 28,            // 追踪怪宽度（像素）
+      "height": 36,           // 追踪怪高度（像素）
+      "speed": 2.5,           // 追踪移动速度
+      "chase_range": 200,     // 开始追踪的距离（像素）
+      "give_up_range": 280,   // 放弃追踪的距离（像素）
+      "hp": 2                 // 追踪怪生命值
     },
-    "knockback_speed": 6,
-    "knockback_duration": 10
+    "knockback_speed": 6,     // 击退初始速度
+    "knockback_duration": 10  // 击退持续帧数
   },
+
+  // ==================== 战斗参数 ====================
   "combat": {
     "melee": {
-      "cooldown_frames": 20,
-      "range": 55,
-      "arc_half": 60,
-      "damage": 2,
-      "duration_frames": 12,
-      "hit_frame": 4,
-      "slash_glow_radius": 40,
-      "slash_trail_count": 10,
-      "impact_ring_radius": 28,
-      "impact_ring_frames": 12,
-      "screen_shake_frames": 4,
-      "screen_shake_intensity": 3,
-      "slash_arc_width": 5,
-      "slash_spark_count": 8
+      "cooldown_frames": 20,         // 近战冷却帧数，两次挥砍间隔
+      "range": 55,                   // 近战攻击距离（像素）
+      "arc_half": 60,                // 挥砍弧线半角（度）
+      "damage": 2,                   // 近战伤害值
+      "duration_frames": 12,         // 挥砍动画总帧数
+      "hit_frame": 4,                // 挥砍第几帧判定伤害
+      "slash_glow_radius": 40,       // 挥砍光晕半径
+      "slash_trail_count": 10,       // 挥砍拖尾数量
+      "impact_ring_radius": 28,      // 命中冲击波环半径
+      "impact_ring_frames": 12,      // 命中冲击波持续帧数
+      "screen_shake_frames": 4,      // 命中屏幕震动帧数
+      "screen_shake_intensity": 3,   // 屏幕震动强度（像素偏移）
+      "slash_arc_width": 5,          // 挥砍弧线宽度
+      "slash_spark_count": 8         // 挥砍火花数量
     },
     "ranged": {
-      "cooldown_frames": 15,
-      "ammo_max": 30,
-      "ammo_initial": 30,
-      "projectile_speed": 12,
-      "projectile_size": 4,
-      "damage": 1,
-      "gravity": 0.08,
-      "max_distance": 600,
-      "reload_frames": 90,
-      "ammo_pickup_amount": 10
+      "cooldown_frames": 15,       // 射击冷却帧数
+      "ammo_max": 30,              // 弹匣容量
+      "ammo_initial": 30,          // 初始弹药数
+      "projectile_speed": 12,      // 子弹飞行速度
+      "projectile_size": 4,        // 子弹大小（像素）
+      "damage": 1,                 // 子弹伤害值
+      "gravity": 0.08,             // 子弹重力（0=直线飞行，越大下坠越快）
+      "max_distance": 600,         // 子弹最大飞行距离（像素）
+      "reload_frames": 90,         // 换弹所需帧数
+      "ammo_pickup_amount": 10     // 拾取弹药包补充量
     }
   },
+
+  // ==================== 武器视觉参数（不影响游戏逻辑） ====================
   "weapon_visual": {
     "knife": {
-      "length": 22,
-      "handle_length": 9,
-      "blade_width": 4
+      "length": 22,          // 刀身长度（像素）
+      "handle_length": 9,    // 刀柄长度（像素）
+      "blade_width": 4       // 刀刃宽度（像素）
     },
     "gun": {
-      "body_length": 24,
-      "barrel_length": 16,
-      "body_height": 8,
-      "recoil_frames": 8,
-      "recoil_distance": 6,
-      "muzzle_flash_duration": 6,
-      "muzzle_flash_size": 20,
-      "casing_eject_distance": 25
+      "body_length": 24,          // 枪身长度
+      "barrel_length": 16,        // 枪管长度
+      "body_height": 8,           // 枪身高度
+      "recoil_frames": 8,         // 后坐力动画帧数
+      "recoil_distance": 6,       // 后坐力偏移距离
+      "muzzle_flash_duration": 6, // 枪口火焰持续帧数
+      "muzzle_flash_size": 20,    // 枪口火焰大小
+      "casing_eject_distance": 25 // 弹壳弹出距离
     }
   },
+
+  // ==================== 道具参数 ====================
   "powerups": {
     "speed_boost": {
-      "base_multiplier": 1.5,
-      "duration_frames": 480,
-      "cooldown_frames": 900,
-      "max_upgrade_level": 3,
-      "upgrade_multiplier_increment": 0.2,
-      "upgrade_duration_increment": 120
+      "base_multiplier": 1.5,                  // 加速基础倍率（1.5=速度提升50%）
+      "duration_frames": 480,                  // 加速持续帧数（60fps下约8秒）
+      "cooldown_frames": 900,                  // 加速冷却帧数（60fps下约15秒）
+      "max_upgrade_level": 3,                  // 最大升级等级
+      "upgrade_multiplier_increment": 0.2,     // 每级倍率增量
+      "upgrade_duration_increment": 120        // 每级持续时间增量（帧）
     },
     "shield": {
-      "base_value": 3,
-      "duration_frames": 720,
-      "cooldown_frames": 1200,
-      "max_upgrade_level": 3,
-      "upgrade_value_increment": 1,
-      "upgrade_duration_increment": 180
+      "base_value": 3,                         // 护盾基础格挡次数
+      "duration_frames": 720,                  // 护盾持续帧数（60fps下约12秒）
+      "cooldown_frames": 1200,                 // 护盾冷却帧数（60fps下约20秒）
+      "max_upgrade_level": 3,                  // 最大升级等级
+      "upgrade_value_increment": 1,            // 每级格挡次数增量
+      "upgrade_duration_increment": 180        // 每级持续时间增量（帧）
     },
     "weapon": {
-      "base_damage_bonus": 1,
-      "base_fire_rate_multiplier": 0.7,
-      "uses_max": 20,
-      "cooldown_frames": 60,
-      "max_upgrade_level": 3,
-      "upgrade_damage_increment": 1,
-      "upgrade_uses_increment": 10
+      "base_damage_bonus": 1,                  // 武器强化基础伤害加成
+      "base_fire_rate_multiplier": 0.7,        // 武器强化射速倍率（<1=射速加快）
+      "uses_max": 20,                          // 武器强化使用次数上限
+      "cooldown_frames": 60,                   // 武器强化冷却帧数
+      "max_upgrade_level": 3,                  // 最大升级等级
+      "upgrade_damage_increment": 1,           // 每级伤害增量
+      "upgrade_uses_increment": 10             // 每级使用次数增量
     },
-    "pickup_radius": 14,
-    "bob_amplitude": 5,
-    "pickup_anim_frames": 20
+    "pickup_radius": 14,          // 道具拾取半径（像素）
+    "bob_amplitude": 5,           // 道具浮动动画幅度
+    "pickup_anim_frames": 20      // 拾取动画持续帧数
   },
+
+  // ==================== HUD 界面参数 ====================
   "hud": {
-    "powerup_icon_size": 48,
-    "powerup_icon_margin": 10,
-    "powerup_start_x": 20,
-    "powerup_start_y_offset": 20,
-    "powerup_bar_height": 6,
-    "powerup_transition_frames": 18,
-    "powerup_hover_scale": 1.15,
-    "powerup_grayscale_alpha": 0.85
+    "powerup_icon_size": 48,          // 道具图标尺寸（像素）
+    "powerup_icon_margin": 10,        // 图标间距
+    "powerup_start_x": 20,            // 道具栏起始 X 坐标
+    "powerup_start_y_offset": 20,     // 道具栏起始 Y 偏移
+    "powerup_bar_height": 6,          // 道具进度条高度
+    "powerup_transition_frames": 18,  // 道具图标切换过渡帧数
+    "powerup_hover_scale": 1.15,      // 鼠标悬停图标缩放比
+    "powerup_grayscale_alpha": 0.85   // 冷却中图标灰度透明度
   },
+
+  // ==================== 音频参数 ====================
   "audio": {
-    "sample_rate": 44100,
-    "bgm_volume_default": 0.6,
-    "sfx_volume_default": 0.8,
-    "bgm_fade_ms": 300
+    "sample_rate": 44100,         // 音频采样率
+    "bgm_volume_default": 0.6,    // 背景音乐默认音量（0~1）
+    "sfx_volume_default": 0.8,    // 音效默认音量（0~1）
+    "bgm_fade_ms": 300            // 背景音乐淡入淡出时间（毫秒）
   },
+
+  // ==================== 音量面板参数 ====================
   "volume_panel": {
-    "x": 20,
-    "y": 50,
-    "width": 280,
-    "height": 150,
-    "slider_width": 200,
-    "slider_height": 10,
-    "slider_knob_size": 16
+    "x": 20,                     // 面板 X 坐标
+    "y": 50,                     // 面板 Y 坐标
+    "width": 280,                // 面板宽度
+    "height": 150,               // 面板高度
+    "slider_width": 200,         // 滑动条宽度
+    "slider_height": 10,         // 滑动条高度
+    "slider_knob_size": 16       // 滑动条旋钮大小
   },
+
+  // ==================== 背景生成参数 ====================
   "background": {
-    "cloud_count": 12,
-    "cloud_alpha_inner": 160,
-    "cloud_alpha_outer": 180,
-    "cloud_seed": 123,
-    "mountain_count": 8,
-    "mountain_seed": 456,
-    "platform_grass_seed": 42
+    "cloud_count": 12,            // 云朵数量
+    "cloud_alpha_inner": 160,     // 云朵内部透明度（0~255）
+    "cloud_alpha_outer": 180,     // 云朵外部透明度（0~255）
+    "cloud_seed": 123,            // 云朵随机种子，同种子=同布局
+    "mountain_count": 8,          // 山脉数量
+    "mountain_seed": 456,         // 山脉随机种子
+    "platform_grass_seed": 42     // 平台草地随机种子
   },
+
+  // ==================== 角色动画参数 ====================
   "animation": {
-    "squash_interpolation": 0.2,
-    "squash_on_jump": 0.7,
-    "squash_on_fall": 1.2,
-    "squash_on_land": 1.3,
-    "squash_normal": 1.0,
-    "run_anim_speed": 0.2,
-    "blink_interval": 180,
-    "blink_duration": 4
+    "squash_interpolation": 0.2,  // 压缩/拉伸插值速度（0~1，越小越平滑）
+    "squash_on_jump": 0.7,        // 起跳时纵向压缩比（<1 变矮）
+    "squash_on_fall": 1.2,        // 下落时纵向拉伸比（>1 变高）
+    "squash_on_land": 1.3,        // 落地时纵向压缩比（>1 变矮扁）
+    "squash_normal": 1.0,         // 恢复正常比例
+    "run_anim_speed": 0.2,        // 跑步动画速度
+    "blink_interval": 180,        // 眨眼间隔帧数
+    "blink_duration": 4           // 眨眼持续帧数
   },
+
+  // ==================== 摄像机参数 ====================
   "camera": {
-    "lerp": 0.08,
-    "target_ratio": 3
+    "lerp": 0.08,            // 摄像机跟随插值系数（0~1，越小越平滑）
+    "target_ratio": 3        // 摄像机偏移：角色在屏幕宽度的 1/N 位置
   },
+
+  // ==================== 粒子效果参数 ====================
   "particles": {
-    "min_speed": 1,
-    "max_speed_extra": 4,
-    "enemy_min_speed": 2,
-    "enemy_max_speed_extra": 6,
-    "hit_min_speed": 2,
-    "hit_max_speed_extra": 5
+    "min_speed": 1,                 // 普通粒子最小速度
+    "max_speed_extra": 4,           // 普通粒子额外最大速度
+    "enemy_min_speed": 2,           // 敌人击杀粒子最小速度
+    "enemy_max_speed_extra": 6,     // 敌人击杀粒子额外最大速度
+    "hit_min_speed": 2,             // 命中粒子最小速度
+    "hit_max_speed_extra": 5        // 命中粒子额外最大速度
   }
 }

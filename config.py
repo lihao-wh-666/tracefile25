@@ -57,10 +57,52 @@ def get_env_bool(name, default=False):
     return default
 
 
+def _strip_json_comments(text):
+    """
+    剥离 JSON 文本中的 // 行注释，支持独立行注释和行内注释。
+    
+    会正确跳过字符串内部的 // （如 URL），不会被误删。
+    
+    Args:
+        text: 原始 JSON 文本
+        
+    Returns:
+        str: 剥离注释后的 JSON 文本
+    """
+    result = []
+    i = 0
+    length = len(text)
+    while i < length:
+        if text[i] == '"':
+            in_string = True
+            result.append(text[i])
+            i += 1
+            while i < length and in_string:
+                if text[i] == '\\' and i + 1 < length:
+                    result.append(text[i])
+                    result.append(text[i + 1])
+                    i += 2
+                elif text[i] == '"':
+                    result.append(text[i])
+                    i += 1
+                    in_string = False
+                else:
+                    result.append(text[i])
+                    i += 1
+        elif text[i] == '/' and i + 1 < length and text[i + 1] == '/':
+            while i < length and text[i] != '\n':
+                i += 1
+        else:
+            result.append(text[i])
+            i += 1
+    return ''.join(result)
+
+
 def _load_game_config():
     """
     从 game_config.json 加载游戏配置。
     
+    支持 // 行注释，方便阅读和修改。
     如果文件不存在或加载失败，返回空字典，
     所有配置将使用代码中的默认值。
     
@@ -70,7 +112,8 @@ def _load_game_config():
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "game_config.json")
     try:
         with open(config_path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            raw = f.read()
+        return json.loads(_strip_json_comments(raw))
     except (FileNotFoundError, json.JSONDecodeError, IOError):
         return {}
 
