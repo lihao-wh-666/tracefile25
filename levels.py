@@ -10,9 +10,101 @@ levels.py - 多关卡数据定义模块
 - 传送门配置（同关卡区域传送 / 跨关卡传送）
 - 玩家出生点
 - 背景风格配置（天空颜色、山脉颜色、云朵颜色、装饰元素等）
+
+关卡数据可从 levels.json 外部文件加载，
+修改关卡数据无需改动代码。
 """
 
+import os
+import json
+
 from config import SCREEN_HEIGHT, SCREEN_WIDTH, PLAYER_SPAWN_X, PLAYER_SPAWN_Y
+
+
+def _load_levels_config():
+    """
+    从 levels.json 加载关卡配置。
+    
+    如果文件不存在或加载失败，返回空列表，
+    所有关卡将使用代码中的默认值。
+    
+    Returns:
+        list: 关卡配置字典列表
+    """
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "levels.json")
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("levels", [])
+    except (FileNotFoundError, json.JSONDecodeError, IOError):
+        return []
+
+
+_LEVELS_JSON = _load_levels_config()
+
+
+def _level_from_json(level_id):
+    """
+    从 JSON 配置构建 LevelConfig 对象。
+    
+    Args:
+        level_id: 关卡编号
+        
+    Returns:
+        LevelConfig or None: 如果 JSON 中有对应关卡则返回，否则返回 None
+    """
+    if not _LEVELS_JSON or level_id >= len(_LEVELS_JSON):
+        return None
+    
+    level_data = _LEVELS_JSON[level_id]
+    
+    def _to_tuple_list(lst):
+        return [tuple(item) for item in lst]
+    
+    def _to_tuple(val):
+        return tuple(val)
+    
+    patrol_specs = []
+    for patrol in level_data.get("patrol_enemy_specs", []):
+        path_points = _to_tuple_list(patrol.get("path_points", []))
+        loop_mode = patrol.get("loop_mode", False)
+        patrol_specs.append((path_points, loop_mode))
+    
+    return LevelConfig(
+        level_id=level_data.get("level_id", level_id),
+        name=level_data.get("name", f"关卡 {level_id + 1}"),
+        description=level_data.get("description", ""),
+        spawn_x=level_data.get("spawn_x", PLAYER_SPAWN_X),
+        spawn_y=level_data.get("spawn_y", PLAYER_SPAWN_Y),
+        ground_specs=_to_tuple_list(level_data.get("ground_specs", [])),
+        floating_specs=_to_tuple_list(level_data.get("floating_specs", [])),
+        coin_positions=_to_tuple_list(level_data.get("coin_positions", [])),
+        ladder_specs=_to_tuple_list(level_data.get("ladder_specs", [])),
+        portal_specs=_to_tuple_list(level_data.get("portal_specs", [])),
+        patrol_enemy_specs=patrol_specs,
+        chase_enemy_specs=_to_tuple_list(level_data.get("chase_enemy_specs", [])),
+        ammo_pickup_specs=_to_tuple_list(level_data.get("ammo_pickup_specs", [])),
+        sky_top=_to_tuple(level_data.get("sky_top", (100, 180, 255))),
+        sky_bottom=_to_tuple(level_data.get("sky_bottom", (200, 230, 255))),
+        mountain_color=_to_tuple(level_data.get("mountain_color", (70, 120, 80))),
+        mountain_snow_color=_to_tuple(level_data.get("mountain_snow_color", (230, 240, 250))),
+        cloud_color=_to_tuple(level_data.get("cloud_color", (255, 255, 255))),
+        cloud_alpha_inner=level_data.get("cloud_alpha_inner", 160),
+        cloud_alpha_outer=level_data.get("cloud_alpha_outer", 180),
+        has_stars=level_data.get("has_stars", False),
+        star_count=level_data.get("star_count", 0),
+        star_seed=level_data.get("star_seed", 0),
+        has_sun=level_data.get("has_sun", False),
+        sun_color=_to_tuple(level_data.get("sun_color", (255, 220, 100))),
+        sun_pos=_to_tuple(level_data.get("sun_pos", (0.85, 0.15))),
+        has_moon=level_data.get("has_moon", False),
+        moon_color=_to_tuple(level_data.get("moon_color", (240, 240, 220))),
+        moon_pos=_to_tuple(level_data.get("moon_pos", (0.85, 0.12))),
+        ground_color=_to_tuple(level_data.get("ground_color", (80, 160, 60))),
+        dirt_color=_to_tuple(level_data.get("dirt_color", (120, 80, 40))),
+        platform_color=_to_tuple(level_data.get("platform_color", (90, 70, 50))),
+        platform_top_color=_to_tuple(level_data.get("platform_top_color", (70, 150, 50))),
+    )
 
 
 class LevelConfig:
@@ -135,7 +227,13 @@ def build_level_0():
     - 传送门 1：传送至高空浮台区域 (x≈2040, 高空)
     - 传送门 2：传送至中段浮台区域 (x≈1390, 中层)
     - 关卡末尾传送门进入第 2 关
+    
+    优先从 levels.json 加载配置，JSON 中不存在时使用代码默认值。
     """
+    json_level = _level_from_json(0)
+    if json_level is not None:
+        return json_level
+    
     ground_specs = [
         (0, SCREEN_HEIGHT - 40, 400, 40),
         (500, SCREEN_HEIGHT - 40, 300, 40),
@@ -245,7 +343,13 @@ def build_level_1():
     - 更复杂的平台布局
     - 传送门 1：传送至高空浮台区域 (x≈1640, 高空)
     - 需要收集 5 枚金币激活终点传送门
+    
+    优先从 levels.json 加载配置，JSON 中不存在时使用代码默认值。
     """
+    json_level = _level_from_json(1)
+    if json_level is not None:
+        return json_level
+    
     ground_specs = [
         (0, SCREEN_HEIGHT - 40, 350, 40),
         (450, SCREEN_HEIGHT - 40, 250, 40),
@@ -361,7 +465,13 @@ def build_level_2():
     - 传送门 1：传送至极高浮台 (x≈1940, 极高空)
     - 传送门 2：传送至中段浮台 (x≈1140, 中层)
     - 需要收集 10 枚金币激活最终传送门
+    
+    优先从 levels.json 加载配置，JSON 中不存在时使用代码默认值。
     """
+    json_level = _level_from_json(2)
+    if json_level is not None:
+        return json_level
+    
     ground_specs = [
         (0, SCREEN_HEIGHT - 40, 300, 40),
         (400, SCREEN_HEIGHT - 40, 200, 40),

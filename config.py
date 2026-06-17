@@ -4,10 +4,14 @@ config.py - 游戏配置模块
 
 集中管理所有环境变量读取、游戏常量和颜色配置，
 便于统一修改和维护。
+
+数值配置可从 game_config.json 外部文件加载，
+修改数值无需改动代码。
 """
 
 import os
 import sys
+import json
 import math
 import random
 import pygame
@@ -53,6 +57,50 @@ def get_env_bool(name, default=False):
     return default
 
 
+def _load_game_config():
+    """
+    从 game_config.json 加载游戏配置。
+    
+    如果文件不存在或加载失败，返回空字典，
+    所有配置将使用代码中的默认值。
+    
+    Returns:
+        dict: 解析后的配置字典
+    """
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "game_config.json")
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, IOError):
+        return {}
+
+
+_GAME_CONFIG = _load_game_config()
+
+
+def _cfg(path, default):
+    """
+    从 JSON 配置中获取值，路径用点号分隔。
+    
+    例如: _cfg("player.speed", 5) 对应 JSON 中 {"player": {"speed": 5}}
+    
+    Args:
+        path: 配置路径，用点号分隔
+        default: 默认值
+        
+    Returns:
+        配置值或默认值
+    """
+    keys = path.split(".")
+    val = _GAME_CONFIG
+    for key in keys:
+        if isinstance(val, dict) and key in val:
+            val = val[key]
+        else:
+            return default
+    return val
+
+
 HEADLESS = get_env_bool("HEADLESS", False)
 HEALTHCHECK = get_env_bool("HEALTHCHECK", False)
 HEALTHCHECK_MAX_FRAMES = get_env_int("HEALTHCHECK_MAX_FRAMES", 300)
@@ -62,37 +110,37 @@ if HEADLESS:
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-SCREEN_WIDTH = get_env_int("SCREEN_WIDTH", 960)
-SCREEN_HEIGHT = get_env_int("SCREEN_HEIGHT", 640)
-FPS = get_env_int("FPS", 60)
+SCREEN_WIDTH = get_env_int("SCREEN_WIDTH", _cfg("screen.width", 960))
+SCREEN_HEIGHT = get_env_int("SCREEN_HEIGHT", _cfg("screen.height", 640))
+FPS = get_env_int("FPS", _cfg("screen.fps", 60))
 
-LEVEL_WIDTH = 3000
-PLAYER_SPAWN_X = 100
-PLAYER_SPAWN_Y = 400
-FALL_RESPAWN_Y = SCREEN_HEIGHT + 100
+LEVEL_WIDTH = _cfg("level.width", 3000)
+PLAYER_SPAWN_X = _cfg("player.spawn_x", 100)
+PLAYER_SPAWN_Y = _cfg("player.spawn_y", 400)
+FALL_RESPAWN_Y = SCREEN_HEIGHT + _cfg("player.fall_respawn_y_offset", 100)
 
-GRAVITY = 0.6
-JUMP_FORCE = -13.5
-MOVE_SPEED = 5
-MAX_FALL_SPEED = 15
-ACCELERATION = 0.8
-FRICTION = 0.82
+GRAVITY = _cfg("physics.gravity", 0.6)
+JUMP_FORCE = _cfg("physics.jump_force", -13.5)
+MOVE_SPEED = _cfg("physics.move_speed", 5)
+MAX_FALL_SPEED = _cfg("physics.max_fall_speed", 15)
+ACCELERATION = _cfg("physics.acceleration", 0.8)
+FRICTION = _cfg("physics.friction", 0.82)
 
-JUMP_BUFFER_FRAMES = 8
-COYOTE_TIME_FRAMES = 6
-SHORT_JUMP_MULTIPLIER = 0.85
-SHORT_JUMP_THRESHOLD = -2
+JUMP_BUFFER_FRAMES = _cfg("physics.jump_buffer_frames", 8)
+COYOTE_TIME_FRAMES = _cfg("physics.coyote_time_frames", 6)
+SHORT_JUMP_MULTIPLIER = _cfg("physics.short_jump_multiplier", 0.85)
+SHORT_JUMP_THRESHOLD = _cfg("physics.short_jump_threshold", -2)
 
-MAX_JUMP_COUNT = 3
-MULTI_JUMP_FORCE = -11.0
-MULTI_JUMP_INTERVAL_FRAMES = 8
+MAX_JUMP_COUNT = _cfg("physics.max_jump_count", 3)
+MULTI_JUMP_FORCE = _cfg("physics.multi_jump_force", -11.0)
+MULTI_JUMP_INTERVAL_FRAMES = _cfg("physics.multi_jump_interval_frames", 8)
 
-LADDER_WIDTH = 24
+LADDER_WIDTH = _cfg("ladder.width", 24)
 LADDER_COLOR = (160, 120, 60)
 LADDER_RUNG_COLOR = (140, 100, 40)
-LADDER_RUNG_SPACING = 20
-CLIMB_SPEED = 3
-SQUASH_ON_CLIMB = 0.9
+LADDER_RUNG_SPACING = _cfg("ladder.rung_spacing", 20)
+CLIMB_SPEED = _cfg("ladder.climb_speed", 3)
+SQUASH_ON_CLIMB = _cfg("ladder.squash_on_climb", 0.9)
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -138,71 +186,71 @@ PLAYER_CHEEK = (255, 160, 160)
 
 COIN_COLOR = (255, 215, 0)
 COIN_DARK = (200, 170, 0)
-COIN_COLLECT_SCORE = 10
+COIN_COLLECT_SCORE = _cfg("coin.collect_score", 10)
 
 PARTICLE_COLORS = [(255, 255, 200), (255, 220, 100), (200, 200, 255)]
 DUST_PARTICLE_COLORS = [(180, 170, 150)]
 
-CLOUD_COUNT = 12
+CLOUD_COUNT = _cfg("background.cloud_count", 12)
 CLOUD_COLOR = (255, 255, 255)
-CLOUD_ALPHA_INNER = 160
-CLOUD_ALPHA_OUTER = 180
-CLOUD_SEED = 123
+CLOUD_ALPHA_INNER = _cfg("background.cloud_alpha_inner", 160)
+CLOUD_ALPHA_OUTER = _cfg("background.cloud_alpha_outer", 180)
+CLOUD_SEED = _cfg("background.cloud_seed", 123)
 
-MOUNTAIN_COUNT = 8
+MOUNTAIN_COUNT = _cfg("background.mountain_count", 8)
 MOUNTAIN_COLOR = (70, 120, 80)
 MOUNTAIN_SNOW_COLOR = (230, 240, 250)
-MOUNTAIN_SEED = 456
+MOUNTAIN_SEED = _cfg("background.mountain_seed", 456)
 
-SQUASH_INTERPOLATION = 0.2
-SQUASH_ON_JUMP = 0.7
-SQUASH_ON_FALL = 1.2
-SQUASH_ON_LAND = 1.3
-SQUASH_NORMAL = 1.0
+SQUASH_INTERPOLATION = _cfg("animation.squash_interpolation", 0.2)
+SQUASH_ON_JUMP = _cfg("animation.squash_on_jump", 0.7)
+SQUASH_ON_FALL = _cfg("animation.squash_on_fall", 1.2)
+SQUASH_ON_LAND = _cfg("animation.squash_on_land", 1.3)
+SQUASH_NORMAL = _cfg("animation.squash_normal", 1.0)
 
-RUN_ANIM_SPEED = 0.2
-BLINK_INTERVAL = 180
-BLINK_DURATION = 4
+RUN_ANIM_SPEED = _cfg("animation.run_anim_speed", 0.2)
+BLINK_INTERVAL = _cfg("animation.blink_interval", 180)
+BLINK_DURATION = _cfg("animation.blink_duration", 4)
 
-COIN_BOB_AMPLITUDE = 4
-COIN_COLLECT_ANIM = 15
+COIN_BOB_AMPLITUDE = _cfg("coin.bob_amplitude", 4)
+COIN_COLLECT_ANIM = _cfg("coin.collect_anim_frames", 15)
 
-PLATFORM_GRASS_SEED = 42
+PLATFORM_GRASS_SEED = _cfg("background.platform_grass_seed", 42)
 
-CAMERA_LERP = 0.08
-CAMERA_TARGET_RATIO = 3
+CAMERA_LERP = _cfg("camera.lerp", 0.08)
+CAMERA_TARGET_RATIO = _cfg("camera.target_ratio", 3)
 
-PORTAL_WIDTH = 60
-PORTAL_HEIGHT = 90
+PORTAL_WIDTH = _cfg("portal.width", 60)
+PORTAL_HEIGHT = _cfg("portal.height", 90)
 PORTAL_COLOR_INNER = (100, 200, 255)
 PORTAL_COLOR_OUTER = (150, 230, 255)
 PORTAL_COLOR_GLOW = (200, 240, 255)
 PORTAL_PARTICLE_COLORS = [(100, 200, 255), (150, 230, 255), (200, 240, 255)]
-PORTAL_ACTIVATION_COINS = 0
-PORTAL_COOLDOWN_FRAMES = 60
+PORTAL_ACTIVATION_COINS = _cfg("portal.activation_coins", 0)
+PORTAL_COOLDOWN_FRAMES = _cfg("portal.cooldown_frames", 60)
 
-TRANSITION_DURATION_FRAMES = 45
+TRANSITION_DURATION_FRAMES = _cfg("transition.duration_frames", 45)
 TRANSITION_COLOR = (0, 0, 0)
-LOADING_BAR_WIDTH = 400
-LOADING_BAR_HEIGHT = 20
+LOADING_BAR_WIDTH = _cfg("transition.loading_bar_width", 400)
+LOADING_BAR_HEIGHT = _cfg("transition.loading_bar_height", 20)
 LOADING_BAR_BG = (60, 60, 80)
 LOADING_BAR_FG = (100, 200, 255)
 LOADING_TEXT_COLOR = (255, 255, 255)
 
-TOTAL_LEVELS = 3
+TOTAL_LEVELS = _cfg("level.total_levels", 3)
 
-AUDIO_SAMPLE_RATE = 44100
-AUDIO_BGM_VOLUME_DEFAULT = 0.6
-AUDIO_SFX_VOLUME_DEFAULT = 0.8
-AUDIO_BGM_FADE_MS = 300
+AUDIO_SAMPLE_RATE = _cfg("audio.sample_rate", 44100)
+AUDIO_BGM_VOLUME_DEFAULT = _cfg("audio.bgm_volume_default", 0.6)
+AUDIO_SFX_VOLUME_DEFAULT = _cfg("audio.sfx_volume_default", 0.8)
+AUDIO_BGM_FADE_MS = _cfg("audio.bgm_fade_ms", 300)
 
-VOLUME_PANEL_X = 20
-VOLUME_PANEL_Y = 50
-VOLUME_PANEL_WIDTH = 280
-VOLUME_PANEL_HEIGHT = 150
-VOLUME_SLIDER_WIDTH = 200
-VOLUME_SLIDER_HEIGHT = 10
-VOLUME_SLIDER_KNOB_SIZE = 16
+VOLUME_PANEL_X = _cfg("volume_panel.x", 20)
+VOLUME_PANEL_Y = _cfg("volume_panel.y", 50)
+VOLUME_PANEL_WIDTH = _cfg("volume_panel.width", 280)
+VOLUME_PANEL_HEIGHT = _cfg("volume_panel.height", 150)
+VOLUME_SLIDER_WIDTH = _cfg("volume_panel.slider_width", 200)
+VOLUME_SLIDER_HEIGHT = _cfg("volume_panel.slider_height", 10)
+VOLUME_SLIDER_KNOB_SIZE = _cfg("volume_panel.slider_knob_size", 16)
 VOLUME_PANEL_BG = (40, 40, 60, 220)
 VOLUME_PANEL_BORDER = (100, 150, 255)
 VOLUME_SLIDER_BG = (60, 60, 80)
@@ -212,11 +260,11 @@ VOLUME_TEXT_COLOR = (255, 255, 255)
 
 SHOW_VOLUME_PANEL_KEY = pygame.K_v
 
-PATROL_ENEMY_WIDTH = 32
-PATROL_ENEMY_HEIGHT = 32
-PATROL_ENEMY_SPEED = 1.5
-PATROL_ENEMY_DETECTION_RANGE = 150
-PATROL_ENEMY_ALERT_SPEED_MULTIPLIER = 1.8
+PATROL_ENEMY_WIDTH = _cfg("enemies.patrol.width", 32)
+PATROL_ENEMY_HEIGHT = _cfg("enemies.patrol.height", 32)
+PATROL_ENEMY_SPEED = _cfg("enemies.patrol.speed", 1.5)
+PATROL_ENEMY_DETECTION_RANGE = _cfg("enemies.patrol.detection_range", 150)
+PATROL_ENEMY_ALERT_SPEED_MULTIPLIER = _cfg("enemies.patrol.alert_speed_multiplier", 1.8)
 PATROL_ENEMY_COLOR = (180, 60, 60)
 PATROL_ENEMY_DARK = (140, 40, 40)
 PATROL_ENEMY_LIGHT = (220, 100, 100)
@@ -224,11 +272,11 @@ PATROL_ENEMY_EYE = (255, 255, 100)
 PATROL_ENEMY_PUPIL = (180, 50, 0)
 PATROL_ENEMY_ALERT_COLOR = (255, 200, 0)
 
-CHASE_ENEMY_WIDTH = 28
-CHASE_ENEMY_HEIGHT = 36
-CHASE_ENEMY_SPEED = 2.5
-CHASE_ENEMY_CHASE_RANGE = 200
-CHASE_ENEMY_GIVE_UP_RANGE = 280
+CHASE_ENEMY_WIDTH = _cfg("enemies.chase.width", 28)
+CHASE_ENEMY_HEIGHT = _cfg("enemies.chase.height", 36)
+CHASE_ENEMY_SPEED = _cfg("enemies.chase.speed", 2.5)
+CHASE_ENEMY_CHASE_RANGE = _cfg("enemies.chase.chase_range", 200)
+CHASE_ENEMY_GIVE_UP_RANGE = _cfg("enemies.chase.give_up_range", 280)
 CHASE_ENEMY_COLOR = (120, 80, 160)
 CHASE_ENEMY_DARK = (80, 50, 120)
 CHASE_ENEMY_LIGHT = (160, 120, 200)
@@ -236,41 +284,41 @@ CHASE_ENEMY_EYE = (255, 100, 255)
 CHASE_ENEMY_PUPIL = (100, 0, 100)
 CHASE_ENEMY_GLOW_COLOR = (200, 100, 255)
 
-PATROL_ENEMY_HP = 3
-CHASE_ENEMY_HP = 2
+PATROL_ENEMY_HP = _cfg("enemies.patrol.hp", 3)
+CHASE_ENEMY_HP = _cfg("enemies.chase.hp", 2)
 
 ENEMY_PARTICLE_COLORS = [(255, 100, 100), (255, 200, 100), (200, 100, 255)]
 
-MELEE_COOLDOWN_FRAMES = 20
-MELEE_RANGE = 55
-MELEE_ARC_HALF = 60
-MELEE_DAMAGE = 2
-MELEE_DURATION_FRAMES = 12
-MELEE_HIT_FRAME = 4
+MELEE_COOLDOWN_FRAMES = _cfg("combat.melee.cooldown_frames", 20)
+MELEE_RANGE = _cfg("combat.melee.range", 55)
+MELEE_ARC_HALF = _cfg("combat.melee.arc_half", 60)
+MELEE_DAMAGE = _cfg("combat.melee.damage", 2)
+MELEE_DURATION_FRAMES = _cfg("combat.melee.duration_frames", 12)
+MELEE_HIT_FRAME = _cfg("combat.melee.hit_frame", 4)
 MELEE_COLOR = (220, 220, 255)
 MELEE_COLOR_TIP = (255, 255, 255)
 MELEE_SWING_PARTICLE_COLORS = [(200, 220, 255), (220, 240, 255), (255, 255, 255)]
 
-RANGED_COOLDOWN_FRAMES = 15
-RANGED_AMMO_MAX = 30
-RANGED_AMMO_INITIAL = 30
-RANGED_PROJECTILE_SPEED = 12
-RANGED_PROJECTILE_SIZE = 4
-RANGED_DAMAGE = 1
-RANGED_GRAVITY = 0.08
-RANGED_MAX_DISTANCE = 600
-RANGED_RELOAD_FRAMES = 90
+RANGED_COOLDOWN_FRAMES = _cfg("combat.ranged.cooldown_frames", 15)
+RANGED_AMMO_MAX = _cfg("combat.ranged.ammo_max", 30)
+RANGED_AMMO_INITIAL = _cfg("combat.ranged.ammo_initial", 30)
+RANGED_PROJECTILE_SPEED = _cfg("combat.ranged.projectile_speed", 12)
+RANGED_PROJECTILE_SIZE = _cfg("combat.ranged.projectile_size", 4)
+RANGED_DAMAGE = _cfg("combat.ranged.damage", 1)
+RANGED_GRAVITY = _cfg("combat.ranged.gravity", 0.08)
+RANGED_MAX_DISTANCE = _cfg("combat.ranged.max_distance", 600)
+RANGED_RELOAD_FRAMES = _cfg("combat.ranged.reload_frames", 90)
 RANGED_COLOR = (255, 255, 100)
 RANGED_COLOR_TRAIL = (255, 200, 50)
 RANGED_HIT_PARTICLE_COLORS = [(255, 255, 100), (255, 200, 50), (255, 150, 30)]
 RANGED_MUZZLE_PARTICLE_COLORS = [(255, 255, 200), (255, 220, 100)]
-RANGED_AMMO_PICKUP_AMOUNT = 10
+RANGED_AMMO_PICKUP_AMOUNT = _cfg("combat.ranged.ammo_pickup_amount", 10)
 AMMO_PICKUP_COLOR = (255, 255, 100)
 AMMO_PICKUP_DARK = (200, 200, 50)
 
 COMBAT_HIT_PARTICLE_COLORS = [(255, 100, 100), (255, 200, 100), (255, 255, 200)]
-ENEMY_KNOCKBACK_SPEED = 6
-ENEMY_KNOCKBACK_DURATION = 10
+ENEMY_KNOCKBACK_SPEED = _cfg("enemies.knockback_speed", 6)
+ENEMY_KNOCKBACK_DURATION = _cfg("enemies.knockback_duration", 10)
 
 KNIFE_BLADE_COLOR = (220, 225, 240)
 KNIFE_BLADE_HIGHLIGHT = (255, 255, 255)
@@ -279,9 +327,9 @@ KNIFE_HANDLE_COLOR = (110, 75, 45)
 KNIFE_HANDLE_WRAP = (160, 115, 65)
 KNIFE_GUARD_COLOR = (210, 175, 80)
 KNIFE_GUARD_DARK = (160, 130, 50)
-KNIFE_LENGTH = 22
-KNIFE_HANDLE_LENGTH = 9
-KNIFE_BLADE_WIDTH = 4
+KNIFE_LENGTH = _cfg("weapon_visual.knife.length", 22)
+KNIFE_HANDLE_LENGTH = _cfg("weapon_visual.knife.handle_length", 9)
+KNIFE_BLADE_WIDTH = _cfg("weapon_visual.knife.blade_width", 4)
 KNIFE_SWING_GLOW_COLOR = (160, 200, 255)
 KNIFE_SLASH_TRAIL_COLOR = (230, 240, 255)
 KNIFE_IMPACT_FLASH_COLOR = (255, 255, 255)
@@ -294,83 +342,83 @@ GUN_BARREL_HIGHLIGHT = (70, 75, 90)
 GUN_GRIP_COLOR = (100, 70, 45)
 GUN_GRIP_WRAP = (135, 95, 60)
 GUN_TRIGGER_COLOR = (30, 30, 35)
-GUN_BODY_LENGTH = 24
-GUN_BARREL_LENGTH = 16
-GUN_BODY_HEIGHT = 8
-GUN_RECOIL_FRAMES = 8
-GUN_RECOIL_DISTANCE = 6
+GUN_BODY_LENGTH = _cfg("weapon_visual.gun.body_length", 24)
+GUN_BARREL_LENGTH = _cfg("weapon_visual.gun.barrel_length", 16)
+GUN_BODY_HEIGHT = _cfg("weapon_visual.gun.body_height", 8)
+GUN_RECOIL_FRAMES = _cfg("weapon_visual.gun.recoil_frames", 8)
+GUN_RECOIL_DISTANCE = _cfg("weapon_visual.gun.recoil_distance", 6)
 MUZZLE_FLASH_COLOR = (255, 255, 200)
 MUZZLE_FLASH_OUTER = (255, 180, 60)
-MUZZLE_FLASH_DURATION = 6
-MUZZLE_FLASH_SIZE = 20
+MUZZLE_FLASH_DURATION = _cfg("weapon_visual.gun.muzzle_flash_duration", 6)
+MUZZLE_FLASH_SIZE = _cfg("weapon_visual.gun.muzzle_flash_size", 20)
 CASING_COLOR = (220, 180, 90)
-CASING_EJECT_DISTANCE = 25
+CASING_EJECT_DISTANCE = _cfg("weapon_visual.gun.casing_eject_distance", 25)
 
-MELEE_SLASH_GLOW_RADIUS = 40
-MELEE_SLASH_TRAIL_COUNT = 10
-MELEE_IMPACT_RING_RADIUS = 28
-MELEE_IMPACT_RING_FRAMES = 12
-MELEE_SCREEN_SHAKE_FRAMES = 4
-MELEE_SCREEN_SHAKE_INTENSITY = 3
+MELEE_SLASH_GLOW_RADIUS = _cfg("combat.melee.slash_glow_radius", 40)
+MELEE_SLASH_TRAIL_COUNT = _cfg("combat.melee.slash_trail_count", 10)
+MELEE_IMPACT_RING_RADIUS = _cfg("combat.melee.impact_ring_radius", 28)
+MELEE_IMPACT_RING_FRAMES = _cfg("combat.melee.impact_ring_frames", 12)
+MELEE_SCREEN_SHAKE_FRAMES = _cfg("combat.melee.screen_shake_frames", 4)
+MELEE_SCREEN_SHAKE_INTENSITY = _cfg("combat.melee.screen_shake_intensity", 3)
 MELEE_SLASH_ARC_COLOR = (255, 240, 200)
-MELEE_SLASH_ARC_WIDTH = 5
-MELEE_SLASH_SPARK_COUNT = 8
+MELEE_SLASH_ARC_WIDTH = _cfg("combat.melee.slash_arc_width", 5)
+MELEE_SLASH_SPARK_COUNT = _cfg("combat.melee.slash_spark_count", 8)
 
-SPEED_BOOST_BASE_MULTIPLIER = 1.5
-SPEED_BOOST_DURATION_FRAMES = 480
-SPEED_BOOST_COOLDOWN_FRAMES = 900
+SPEED_BOOST_BASE_MULTIPLIER = _cfg("powerups.speed_boost.base_multiplier", 1.5)
+SPEED_BOOST_DURATION_FRAMES = _cfg("powerups.speed_boost.duration_frames", 480)
+SPEED_BOOST_COOLDOWN_FRAMES = _cfg("powerups.speed_boost.cooldown_frames", 900)
 SPEED_BOOST_COLOR = (0, 200, 255)
 SPEED_BOOST_DARK = (0, 150, 200)
 SPEED_BOOST_GLOW = (100, 230, 255)
 SPEED_BOOST_TRAIL_COLORS = [(0, 200, 255), (100, 230, 255), (200, 245, 255)]
-SPEED_BOOST_MAX_UPGRADE_LEVEL = 3
-SPEED_BOOST_UPGRADE_MULTIPLIER_INCREMENT = 0.2
-SPEED_BOOST_UPGRADE_DURATION_INCREMENT = 120
+SPEED_BOOST_MAX_UPGRADE_LEVEL = _cfg("powerups.speed_boost.max_upgrade_level", 3)
+SPEED_BOOST_UPGRADE_MULTIPLIER_INCREMENT = _cfg("powerups.speed_boost.upgrade_multiplier_increment", 0.2)
+SPEED_BOOST_UPGRADE_DURATION_INCREMENT = _cfg("powerups.speed_boost.upgrade_duration_increment", 120)
 
-SHIELD_BASE_VALUE = 3
-SHIELD_DURATION_FRAMES = 720
-SHIELD_COOLDOWN_FRAMES = 1200
+SHIELD_BASE_VALUE = _cfg("powerups.shield.base_value", 3)
+SHIELD_DURATION_FRAMES = _cfg("powerups.shield.duration_frames", 720)
+SHIELD_COOLDOWN_FRAMES = _cfg("powerups.shield.cooldown_frames", 1200)
 SHIELD_COLOR = (0, 220, 120)
 SHIELD_DARK = (0, 170, 90)
 SHIELD_GLOW = (100, 255, 180)
 SHIELD_BORDER = (0, 140, 70)
 SHIELD_PARTICLE_COLORS = [(0, 220, 120), (100, 255, 180), (150, 255, 200)]
-SHIELD_MAX_UPGRADE_LEVEL = 3
-SHIELD_UPGRADE_VALUE_INCREMENT = 1
-SHIELD_UPGRADE_DURATION_INCREMENT = 180
+SHIELD_MAX_UPGRADE_LEVEL = _cfg("powerups.shield.max_upgrade_level", 3)
+SHIELD_UPGRADE_VALUE_INCREMENT = _cfg("powerups.shield.upgrade_value_increment", 1)
+SHIELD_UPGRADE_DURATION_INCREMENT = _cfg("powerups.shield.upgrade_duration_increment", 180)
 
-WEAPON_BASE_DAMAGE_BONUS = 1
-WEAPON_BASE_FIRE_RATE_MULTIPLIER = 0.7
-WEAPON_USES_MAX = 20
-WEAPON_COOLDOWN_FRAMES = 60
+WEAPON_BASE_DAMAGE_BONUS = _cfg("powerups.weapon.base_damage_bonus", 1)
+WEAPON_BASE_FIRE_RATE_MULTIPLIER = _cfg("powerups.weapon.base_fire_rate_multiplier", 0.7)
+WEAPON_USES_MAX = _cfg("powerups.weapon.uses_max", 20)
+WEAPON_COOLDOWN_FRAMES = _cfg("powerups.weapon.cooldown_frames", 60)
 WEAPON_COLOR = (255, 100, 50)
 WEAPON_DARK = (200, 70, 30)
 WEAPON_GLOW = (255, 150, 100)
 WEAPON_SPARK_COLORS = [(255, 100, 50), (255, 150, 100), (255, 200, 150), (255, 255, 200)]
-WEAPON_MAX_UPGRADE_LEVEL = 3
-WEAPON_UPGRADE_DAMAGE_INCREMENT = 1
-WEAPON_UPGRADE_USES_INCREMENT = 10
+WEAPON_MAX_UPGRADE_LEVEL = _cfg("powerups.weapon.max_upgrade_level", 3)
+WEAPON_UPGRADE_DAMAGE_INCREMENT = _cfg("powerups.weapon.upgrade_damage_increment", 1)
+WEAPON_UPGRADE_USES_INCREMENT = _cfg("powerups.weapon.upgrade_uses_increment", 10)
 WEAPON_TYPES = ["power_knife", "rapid_gun", "blast_shotgun"]
 WEAPON_CURRENT_KEY = pygame.K_q
 
-POWERUP_PICKUP_RADIUS = 14
-POWERUP_BOB_AMPLITUDE = 5
-POWERUP_PICKUP_ANIM_FRAMES = 20
+POWERUP_PICKUP_RADIUS = _cfg("powerups.pickup_radius", 14)
+POWERUP_BOB_AMPLITUDE = _cfg("powerups.bob_amplitude", 5)
+POWERUP_PICKUP_ANIM_FRAMES = _cfg("powerups.pickup_anim_frames", 20)
 POWERUP_SAVE_FILE = "powerups_save.json"
 
-HUD_POWERUP_ICON_SIZE = 48
-HUD_POWERUP_ICON_MARGIN = 10
-HUD_POWERUP_START_X = 20
-HUD_POWERUP_START_Y_OFFSET = 20
-HUD_POWERUP_BAR_HEIGHT = 6
+HUD_POWERUP_ICON_SIZE = _cfg("hud.powerup_icon_size", 48)
+HUD_POWERUP_ICON_MARGIN = _cfg("hud.powerup_icon_margin", 10)
+HUD_POWERUP_START_X = _cfg("hud.powerup_start_x", 20)
+HUD_POWERUP_START_Y_OFFSET = _cfg("hud.powerup_start_y_offset", 20)
+HUD_POWERUP_BAR_HEIGHT = _cfg("hud.powerup_bar_height", 6)
 HUD_POWERUP_BAR_BG = (50, 50, 70)
 HUD_POWERUP_TEXT_COLOR = (255, 255, 255)
 HUD_POWERUP_TOOLTIP_BG = (20, 30, 50, 230)
 HUD_POWERUP_TOOLTIP_BORDER = (100, 200, 255)
 HUD_POWERUP_TOOLTIP_TEXT = (255, 255, 255)
-HUD_POWERUP_TRANSITION_FRAMES = 18
-HUD_POWERUP_HOVER_SCALE = 1.15
-HUD_POWERUP_GRAYSCALE_ALPHA = 0.85
+HUD_POWERUP_TRANSITION_FRAMES = _cfg("hud.powerup_transition_frames", 18)
+HUD_POWERUP_HOVER_SCALE = _cfg("hud.powerup_hover_scale", 1.15)
+HUD_POWERUP_GRAYSCALE_ALPHA = _cfg("hud.powerup_grayscale_alpha", 0.85)
 
 SHIELD_COLOR_GLOW = (150, 255, 210)
 

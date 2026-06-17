@@ -1,0 +1,206 @@
+{
+  "screen": {
+    "width": 960,
+    "height": 640,
+    "fps": 60
+  },
+  "level": {
+    "width": 3000,
+    "total_levels": 3
+  },
+  "player": {
+    "spawn_x": 100,
+    "spawn_y": 400,
+    "fall_respawn_y_offset": 100
+  },
+  "physics": {
+    "gravity": 0.6,
+    "jump_force": -13.5,
+    "move_speed": 5,
+    "max_fall_speed": 15,
+    "acceleration": 0.8,
+    "friction": 0.82,
+    "jump_buffer_frames": 8,
+    "coyote_time_frames": 6,
+    "short_jump_multiplier": 0.85,
+    "short_jump_threshold": -2,
+    "max_jump_count": 3,
+    "multi_jump_force": -11.0,
+    "multi_jump_interval_frames": 8
+  },
+  "ladder": {
+    "width": 24,
+    "climb_speed": 3,
+    "squash_on_climb": 0.9,
+    "rung_spacing": 20
+  },
+  "coin": {
+    "collect_score": 10,
+    "bob_amplitude": 4,
+    "collect_anim_frames": 15
+  },
+  "portal": {
+    "width": 60,
+    "height": 90,
+    "activation_coins": 0,
+    "cooldown_frames": 60
+  },
+  "transition": {
+    "duration_frames": 45,
+    "loading_bar_width": 400,
+    "loading_bar_height": 20
+  },
+  "enemies": {
+    "patrol": {
+      "width": 32,
+      "height": 32,
+      "speed": 1.5,
+      "detection_range": 150,
+      "alert_speed_multiplier": 1.8,
+      "hp": 3
+    },
+    "chase": {
+      "width": 28,
+      "height": 36,
+      "speed": 2.5,
+      "chase_range": 200,
+      "give_up_range": 280,
+      "hp": 2
+    },
+    "knockback_speed": 6,
+    "knockback_duration": 10
+  },
+  "combat": {
+    "melee": {
+      "cooldown_frames": 20,
+      "range": 55,
+      "arc_half": 60,
+      "damage": 2,
+      "duration_frames": 12,
+      "hit_frame": 4,
+      "slash_glow_radius": 40,
+      "slash_trail_count": 10,
+      "impact_ring_radius": 28,
+      "impact_ring_frames": 12,
+      "screen_shake_frames": 4,
+      "screen_shake_intensity": 3,
+      "slash_arc_width": 5,
+      "slash_spark_count": 8
+    },
+    "ranged": {
+      "cooldown_frames": 15,
+      "ammo_max": 30,
+      "ammo_initial": 30,
+      "projectile_speed": 12,
+      "projectile_size": 4,
+      "damage": 1,
+      "gravity": 0.08,
+      "max_distance": 600,
+      "reload_frames": 90,
+      "ammo_pickup_amount": 10
+    }
+  },
+  "weapon_visual": {
+    "knife": {
+      "length": 22,
+      "handle_length": 9,
+      "blade_width": 4
+    },
+    "gun": {
+      "body_length": 24,
+      "barrel_length": 16,
+      "body_height": 8,
+      "recoil_frames": 8,
+      "recoil_distance": 6,
+      "muzzle_flash_duration": 6,
+      "muzzle_flash_size": 20,
+      "casing_eject_distance": 25
+    }
+  },
+  "powerups": {
+    "speed_boost": {
+      "base_multiplier": 1.5,
+      "duration_frames": 480,
+      "cooldown_frames": 900,
+      "max_upgrade_level": 3,
+      "upgrade_multiplier_increment": 0.2,
+      "upgrade_duration_increment": 120
+    },
+    "shield": {
+      "base_value": 3,
+      "duration_frames": 720,
+      "cooldown_frames": 1200,
+      "max_upgrade_level": 3,
+      "upgrade_value_increment": 1,
+      "upgrade_duration_increment": 180
+    },
+    "weapon": {
+      "base_damage_bonus": 1,
+      "base_fire_rate_multiplier": 0.7,
+      "uses_max": 20,
+      "cooldown_frames": 60,
+      "max_upgrade_level": 3,
+      "upgrade_damage_increment": 1,
+      "upgrade_uses_increment": 10
+    },
+    "pickup_radius": 14,
+    "bob_amplitude": 5,
+    "pickup_anim_frames": 20
+  },
+  "hud": {
+    "powerup_icon_size": 48,
+    "powerup_icon_margin": 10,
+    "powerup_start_x": 20,
+    "powerup_start_y_offset": 20,
+    "powerup_bar_height": 6,
+    "powerup_transition_frames": 18,
+    "powerup_hover_scale": 1.15,
+    "powerup_grayscale_alpha": 0.85
+  },
+  "audio": {
+    "sample_rate": 44100,
+    "bgm_volume_default": 0.6,
+    "sfx_volume_default": 0.8,
+    "bgm_fade_ms": 300
+  },
+  "volume_panel": {
+    "x": 20,
+    "y": 50,
+    "width": 280,
+    "height": 150,
+    "slider_width": 200,
+    "slider_height": 10,
+    "slider_knob_size": 16
+  },
+  "background": {
+    "cloud_count": 12,
+    "cloud_alpha_inner": 160,
+    "cloud_alpha_outer": 180,
+    "cloud_seed": 123,
+    "mountain_count": 8,
+    "mountain_seed": 456,
+    "platform_grass_seed": 42
+  },
+  "animation": {
+    "squash_interpolation": 0.2,
+    "squash_on_jump": 0.7,
+    "squash_on_fall": 1.2,
+    "squash_on_land": 1.3,
+    "squash_normal": 1.0,
+    "run_anim_speed": 0.2,
+    "blink_interval": 180,
+    "blink_duration": 4
+  },
+  "camera": {
+    "lerp": 0.08,
+    "target_ratio": 3
+  },
+  "particles": {
+    "min_speed": 1,
+    "max_speed_extra": 4,
+    "enemy_min_speed": 2,
+    "enemy_max_speed_extra": 6,
+    "hit_min_speed": 2,
+    "hit_max_speed_extra": 5
+  }
+}
