@@ -19,6 +19,13 @@ from config import (
     PORTAL_WIDTH, PORTAL_HEIGHT,
     PORTAL_COLOR_INNER, PORTAL_COLOR_OUTER, PORTAL_COLOR_GLOW,
     PORTAL_ACTIVATION_COINS, PORTAL_COOLDOWN_FRAMES,
+    FRAGILE_CRACK_DELAY_FRAMES, FRAGILE_RESPAWN_COOLDOWN_FRAMES,
+    FRAGILE_WARNING_FLASH_INTERVAL, FRAGILE_BREAK_ANIMATION_FRAMES,
+    FRAGILE_PARTICLE_COUNT,
+    FRAGILE_PLATFORM_COLOR, FRAGILE_PLATFORM_TOP_COLOR,
+    FRAGILE_PLATFORM_CRACK_COLOR, FRAGILE_PLATFORM_WARNING_COLOR,
+    FRAGILE_PLATFORM_GHOST_COLOR, FRAGILE_PARTICLE_COLORS,
+    FPS,
 )
 
 
@@ -345,3 +352,257 @@ class Portal:
             px = cx + int(math.cos(angle) * swirl_r * 0.5)
             py = cy + int(math.sin(angle) * swirl_r * 0.5 * 0.7)
             pygame.draw.circle(surface, (255, 255, 255), (px, py), 2)
+
+
+class FragilePlatformState:
+    SOLID = 0
+    CRACKING = 1
+    BROKEN = 2
+    COOLDOWN = 3
+
+
+class FragilePlatform:
+    """
+    易碎平台类，实现状态机循环：
+      SOLID（完整可踩踏）
+        ↓ 玩家踩踏达到 CRACK_DELAY
+      CRACKING（预警闪烁）
+        ↓ 达到 BREAK_ANIMATION
+      BROKEN（碎裂失效，无碰撞）
+        ↓ 达到 RESPAWN_COOLDOWN
+      COOLDOWN（幽灵轮廓，冷却恢复）
+        ↓ 冷却结束
+      SOLID（恢复）
+
+    属性:
+        rect: 平台碰撞矩形
+        state: 当前状态 (FragilePlatformState)
+        timer: 各阶段通用计时器（帧）
+        stand_timer: 玩家持续踩踏计时器（帧）
+        was_standing: 上一帧玩家是否站在平台上
+        crack_lines: 碎裂裂纹坐标列表
+        break_particles: 碎裂动画过程中产生的粒子数据列表
+        spawn_particles_cb: 粒子生成回调函数 (x, y, count, colors)
+    """
+
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.state = FragilePlatformState.SOLID
+        self.timer = 0
+        self.stand_timer = 0
+        self.was_standing = False
+        self.crack_lines = []
+        self.break_particles = []
+        self.spawn_particles_cb = None
+        self._flash_counter = 0
+
+    def is_solid(self):
+        """返回当前是否具有实体碰撞（可踩踏）。"""
+        return self.state in (FragilePlatformState.SOLID, FragilePlatformState.CRACKING)
+
+    def _player_is_standing(self, player_rect):
+        """
+        检测玩家是否稳定地站在平台顶部。
+
+        判定条件：
+        1. 玩家矩形底部与平台顶部距离 <= 2 像素
+        2. 水平方向有重叠
+        3. 玩家垂直速度 >= 0（非上升中）
+        """
+        if player_rect is None:
+            return False
+        horizontal_overlap = (
+            player_rect.right > self.rect.left + 2
+            and player_rect.left < self.rect.right - 2
+        )
+        vertical_align = abs((player_rect.bottom) - self.rect.top) <= 3
+        return horizontal_overlap and vertical_align
+
+    def _generate_crack_lines(self):
+        """生成预警阶段显示的裂纹线条。"""
+        self.crack_lines = []
+        w, h = self.rect.width, self.rect.height
+        rng = random.Random(hash((self.rect.x, self.rect.y, w)))
+        num_lines = max(3, w // 20)
+        for _ in range(num_lines):
+            x_start = rng.randint(4, w - 4)
+            y_start = rng.randint(2, h // 2)
+            segments = []
+            cx, cy = x_start, y_start
+            for _ in range(rng.randint(2, 4)):
+                nx = cx + rng.randint(-8, 8)
+                ny = cy + rng.randint(2, max(3, h // 3))
+                nx = max(2, min(w - 2, nx))
+                ny = max(2, min(h - 2, ny))
+                segments.append((cx, cy, nx, ny))
+                cx, cy = nx, ny
+            self.crack_lines.extend(segments)
+
+    def _init_break_animation(self):
+        """触发碎裂：生成碎裂动画粒子数据并调用粒子回调。"""
+        if self.spawn_particles_cb:
+            cx = self.rect.x + self.rect.width // 2
+            cy = self.rect.y + self.rect.height // 2
+            self.spawn_particles_cb(
+                cx, cy,
+                count=FRAGILE_PARTICLE_COUNT,
+                colors=FRAGILE_PARTICLE_COLORS,
+                spread=5, life=30, size=4,
+            )
+
+        rng = random.Random(hash((self.rect.x, self.rect.y, self.rect.width, "break")))
+        num_pieces = max(6, self.rect.width // 12)
+        self.break_particles = []
+        for _ in range(num_pieces):
+            px = self.rect.x + rng.randint(0, self.rect.width)
+            py = self.rect.y + rng.randint(0, self.rect.height)
+            vx = rng.uniform(-4, 4)
+            vy = rng.uniform(-6, -1)
+            size = rng.randint(3, 7)
+            color_idx = rng.randint(0, len(FRAGILE_PARTICLE_COLORS) - 1)
+            self.break_particles.append([px, py, vx, vy, size, color_idx])
+
+    def _update_break_particles(self):
+        """更新碎裂碎片的物理运动。"""
+        if not self.break_particles:
+            return
+        gravity = 0.4
+        for p in self.break_particles:
+            p[3] += gravity
+            p[0] += p[2]
+            p[1] += p[3]
+        self.break_particles = [p for p in self.break_particles if p[1] < self.rect.y + 400]
+
+    def update(self, player_rect=None, player_vy=0):
+        """
+        每帧更新易碎平台状态机。
+
+        Args:
+            player_rect: 玩家碰撞矩形（pygame.Rect），用于检测踩踏
+            player_vy: 玩家当前垂直速度，辅助判定落地
+        """
+        standing = self._player_is_standing(player_rect) if player_rect else False
+
+        if self.state == FragilePlatformState.SOLID:
+            if standing:
+                self.stand_timer += 1
+                if self.stand_timer >= FRAGILE_CRACK_DELAY_FRAMES:
+                    self.state = FragilePlatformState.CRACKING
+                    self.timer = 0
+                    self._generate_crack_lines()
+            else:
+                self.stand_timer = max(0, self.stand_timer - 2)
+            self.was_standing = standing
+
+        elif self.state == FragilePlatformState.CRACKING:
+            self.timer += 1
+            self._flash_counter += 1
+            if self.timer >= FRAGILE_BREAK_ANIMATION_FRAMES:
+                self.state = FragilePlatformState.BROKEN
+                self.timer = 0
+                self._init_break_animation()
+            self.was_standing = standing
+
+        elif self.state == FragilePlatformState.BROKEN:
+            self.timer += 1
+            self._update_break_particles()
+            if self.timer >= FRAGILE_BREAK_ANIMATION_FRAMES:
+                self.state = FragilePlatformState.COOLDOWN
+                self.timer = 0
+            self.was_standing = False
+
+        elif self.state == FragilePlatformState.COOLDOWN:
+            self.timer += 1
+            self._flash_counter += 1
+            if self.timer >= FRAGILE_RESPAWN_COOLDOWN_FRAMES:
+                self.state = FragilePlatformState.SOLID
+                self.timer = 0
+                self.stand_timer = 0
+                self.crack_lines = []
+                self.break_particles = []
+            self.was_standing = False
+
+    def draw(self, surface, camera_x, level_config=None):
+        """
+        根据当前状态绘制易碎平台。
+
+        状态视觉:
+        - SOLID:     木质色平台 + 顶部亮边（轻微色调区别于普通平台）
+        - CRACKING:  叠加裂纹 + 橙/原色交替闪烁预警
+        - BROKEN:    绘制飞溅碎片，平台本身不可见
+        - COOLDOWN:  半透明幽灵轮廓 + 呼吸闪烁效果
+        """
+        draw_x = self.rect.x - camera_x
+        draw_rect = pygame.Rect(draw_x, self.rect.y, self.rect.width, self.rect.height)
+
+        if draw_rect.right < -50 or draw_rect.left > SCREEN_WIDTH + 50:
+            return
+
+        if level_config:
+            plat_col = level_config.platform_color
+            plat_top_col = level_config.platform_top_color
+        else:
+            plat_col = FRAGILE_PLATFORM_COLOR
+            plat_top_col = FRAGILE_PLATFORM_TOP_COLOR
+
+        if self.state == FragilePlatformState.SOLID:
+            pygame.draw.rect(surface, plat_col, draw_rect)
+            top_rect = pygame.Rect(draw_rect.x, draw_rect.y, draw_rect.width, 5)
+            pygame.draw.rect(surface, plat_top_col, top_rect)
+            if self.stand_timer > 0 and FRAGILE_CRACK_DELAY_FRAMES > 0:
+                progress = self.stand_timer / FRAGILE_CRACK_DELAY_FRAMES
+                if progress > 0.3:
+                    bar_w = int(draw_rect.width * progress)
+                    bar_rect = pygame.Rect(
+                        draw_rect.x, draw_rect.y - 5, bar_w, 3
+                    )
+                    progress_color = (
+                        int(255 * progress),
+                        int(200 * (1 - progress)),
+                        40,
+                    )
+                    pygame.draw.rect(surface, progress_color, bar_rect)
+
+        elif self.state == FragilePlatformState.CRACKING:
+            flash_on = (self._flash_counter // FRAGILE_WARNING_FLASH_INTERVAL) % 2 == 0
+            base_col = FRAGILE_PLATFORM_WARNING_COLOR if flash_on else plat_col
+            pygame.draw.rect(surface, base_col, draw_rect)
+            top_col = FRAGILE_PLATFORM_WARNING_COLOR if flash_on else plat_top_col
+            top_rect = pygame.Rect(draw_rect.x, draw_rect.y, draw_rect.width, 5)
+            pygame.draw.rect(surface, top_col, top_rect)
+            for x1, y1, x2, y2 in self.crack_lines:
+                pygame.draw.line(
+                    surface, FRAGILE_PLATFORM_CRACK_COLOR,
+                    (draw_rect.x + x1, draw_rect.y + y1),
+                    (draw_rect.x + x2, draw_rect.y + y2),
+                    2,
+                )
+
+        elif self.state == FragilePlatformState.BROKEN:
+            for (px, py, vx, vy, size, ci) in self.break_particles:
+                color = FRAGILE_PARTICLE_COLORS[ci % len(FRAGILE_PARTICLE_COLORS)]
+                pygame.draw.rect(
+                    surface, color,
+                    (int(px - camera_x), int(py), size, size),
+                )
+
+        elif self.state == FragilePlatformState.COOLDOWN:
+            pulse = (math.sin(self._flash_counter * 0.1) + 1) * 0.5
+            alpha = int(60 + pulse * 60)
+            ghost_surf = pygame.Surface(
+                (draw_rect.width, draw_rect.height), pygame.SRCALPHA
+            )
+            ghost_r, ghost_g, ghost_b = FRAGILE_PLATFORM_GHOST_COLOR
+            pygame.draw.rect(
+                ghost_surf, (ghost_r, ghost_g, ghost_b, alpha),
+                (0, 0, draw_rect.width, draw_rect.height),
+                2,
+            )
+            surface.blit(ghost_surf, (draw_rect.x, draw_rect.y))
+            if FRAGILE_RESPAWN_COOLDOWN_FRAMES > 0:
+                progress = 1.0 - (self.timer / FRAGILE_RESPAWN_COOLDOWN_FRAMES)
+                bar_w = int(draw_rect.width * progress)
+                bar_rect = pygame.Rect(
+                    draw_rect.x, draw_rect.y + draw_rect.height + 3, bar_w, 2
+                )
+                pygame.draw.rect(surface, FRAGILE_PLATFORM_GHOST_COLOR, bar_rect)

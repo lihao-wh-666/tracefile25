@@ -465,4 +465,17 @@ HUD_POWERUP_GRAYSCALE_ALPHA = _cfg("hud.powerup_grayscale_alpha", 0.85)
 
 SHIELD_COLOR_GLOW = (150, 255, 210)
 
+FRAGILE_CRACK_DELAY_FRAMES = int(_cfg("fragile_platform.crack_delay_seconds", 2.0) * FPS)
+FRAGILE_RESPAWN_COOLDOWN_FRAMES = int(_cfg("fragile_platform.respawn_cooldown_seconds", 2.0) * FPS)
+FRAGILE_WARNING_FLASH_INTERVAL = _cfg("fragile_platform.warning_flash_interval_frames", 6)
+FRAGILE_BREAK_ANIMATION_FRAMES = _cfg("fragile_platform.break_animation_frames", 15)
+FRAGILE_PARTICLE_COUNT = _cfg("fragile_platform.particle_count", 12)
+
+FRAGILE_PLATFORM_COLOR = (180, 140, 90)
+FRAGILE_PLATFORM_TOP_COLOR = (210, 170, 110)
+FRAGILE_PLATFORM_CRACK_COLOR = (120, 80, 50)
+FRAGILE_PLATFORM_WARNING_COLOR = (255, 180, 60)
+FRAGILE_PLATFORM_GHOST_COLOR = (160, 160, 180)
+FRAGILE_PARTICLE_COLORS = [(180, 140, 90), (210, 170, 110), (140, 100, 60)]
+
 FRAME_COUNTER = 0

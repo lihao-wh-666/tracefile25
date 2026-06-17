@@ -7,7 +7,7 @@ entities/__init__.py - 实体模块导出
 
 from .base import BaseEntity, resolve_horizontal_collision, resolve_vertical_collision
 from .items import Particle, Coin, AmmoPickup
-from .world import Platform, Ladder, Portal
+from .world import Platform, Ladder, Portal, FragilePlatform, FragilePlatformState
 from .enemies import PatrolEnemy, ChaseEnemy
 from .combat import Bullet
 from .player import Player
@@ -33,6 +33,8 @@ __all__ = [
     "Platform",
     "Ladder",
     "Portal",
+    "FragilePlatform",
+    "FragilePlatformState",
     "PatrolEnemy",
     "ChaseEnemy",
     "Bullet",

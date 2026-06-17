@@ -9,7 +9,7 @@ from config import (
     PLAYER_SPAWN_X, PLAYER_SPAWN_Y,
 )
 
-from entities import Platform, Coin, Ladder, Portal, PatrolEnemy, ChaseEnemy, AmmoPickup, Player
+from entities import Platform, Coin, Ladder, Portal, PatrolEnemy, ChaseEnemy, AmmoPickup, Player, FragilePlatform
 from levels import get_level_config
 
 
@@ -34,6 +34,7 @@ class LevelLoader:
             level_config: LevelConfig 关卡配置对象
         """
         self.game.platforms = []
+        self.game.fragile_platforms = []
         self.game.coins = []
         self.game.ladders = []
         self.game.portals = []
@@ -47,6 +48,12 @@ class LevelLoader:
 
         for x, y, w, h in level_config.floating_specs:
             self.game.platforms.append(Platform(x, y, w, h))
+
+        for x, y, w, h in level_config.fragile_platform_specs:
+            fp = FragilePlatform(x, y, w, h)
+            fp.spawn_particles_cb = self.game._spawn_fragile_platform_particles
+            self.game.fragile_platforms.append(fp)
+            self.game.platforms.append(fp)
 
         for x, y in level_config.coin_positions:
             self.game.coins.append(Coin(x, y))

@@ -33,6 +33,7 @@ from config import (
     PORTAL_COOLDOWN_FRAMES,
     SPEED_BOOST_TRAIL_COLORS,
     SHIELD_PARTICLE_COLORS, WEAPON_SPARK_COLORS,
+    FRAGILE_PARTICLE_COLORS,
 )
 
 from entities import (
@@ -98,6 +99,7 @@ class Game:
         self.camera_x = 0
 
         self.platforms = []
+        self.fragile_platforms = []
         self.coins = []
         self.ladders = []
         self.portals = []
@@ -340,16 +342,24 @@ class Game:
 
     def _spawn_particles(
         self, x, y, count, colors=PARTICLE_COLORS,
-        spread=3, life=20, size=3
+        spread=3, life=20, size=3, vx=None, vy=None,
     ):
         """在指定位置生成一批粒子。"""
         for _ in range(count):
-            vx = random.uniform(-spread, spread)
-            vy = random.uniform(-spread * 1.5, -0.5)
+            pvx = random.uniform(-spread, spread) if vx is None else vx + random.uniform(-spread, spread)
+            pvy = random.uniform(-spread * 1.5, -0.5) if vy is None else vy + random.uniform(-spread, spread)
             color = random.choice(colors)
             l = random.randint(life // 2, life)
             s = random.randint(1, size)
-            self.particles.append(Particle(x, y, vx, vy, color, l, s))
+            self.particles.append(Particle(x, y, pvx, pvy, color, l, s))
+
+    def _spawn_fragile_platform_particles(
+        self, x, y, count=12, colors=None, spread=5, life=30, size=4,
+    ):
+        """易碎平台碎裂时生成的粒子（回调给 FragilePlatform）。"""
+        if colors is None:
+            colors = FRAGILE_PARTICLE_COLORS
+        self._spawn_particles(x, y, count=count, colors=colors, spread=spread, life=life, size=size)
 
     def _update_camera(self):
         """更新相机位置，使用 LERP 平滑跟随。"""
@@ -913,6 +923,10 @@ class Game:
         self.particles = [p for p in self.particles if p.life > 0]
         for p in self.particles:
             p.update()
+
+        player_rect = self.player.get_rect()
+        for fp in self.fragile_platforms:
+            fp.update(player_rect, self.player.vy)
 
         self._update_camera()
 

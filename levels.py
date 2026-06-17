@@ -71,7 +71,7 @@ def _level_from_json(level_id):
         path_points = _to_tuple_list(patrol.get("path_points", []))
         loop_mode = patrol.get("loop_mode", False)
         patrol_specs.append((path_points, loop_mode))
-    
+
     return LevelConfig(
         level_id=level_data.get("level_id", level_id),
         name=level_data.get("name", f"关卡 {level_id + 1}"),
@@ -80,6 +80,7 @@ def _level_from_json(level_id):
         spawn_y=level_data.get("spawn_y", PLAYER_SPAWN_Y),
         ground_specs=_to_tuple_list(level_data.get("ground_specs", [])),
         floating_specs=_to_tuple_list(level_data.get("floating_specs", [])),
+        fragile_platform_specs=_to_tuple_list(level_data.get("fragile_platform_specs", [])),
         coin_positions=_to_tuple_list(level_data.get("coin_positions", [])),
         ladder_specs=_to_tuple_list(level_data.get("ladder_specs", [])),
         portal_specs=_to_tuple_list(level_data.get("portal_specs", [])),
@@ -122,6 +123,7 @@ class LevelConfig:
         spawn_x, spawn_y: 玩家初始出生坐标
         ground_specs: 地面平台规格列表 [(x, y, w, h), ...]
         floating_specs: 浮动平台规格列表 [(x, y, w, h), ...]
+        fragile_platform_specs: 易碎平台规格列表 [(x, y, w, h), ...]
         coin_positions: 金币坐标列表 [(x, y), ...]
         ladder_specs: 梯子规格列表 [(x, y, h), ...]
         portal_specs: 传送门规格列表 [(x, y, target_level, tx, ty, required_coins), ...]
@@ -161,6 +163,7 @@ class LevelConfig:
         coin_positions,
         ladder_specs,
         portal_specs,
+        fragile_platform_specs=None,
         patrol_enemy_specs=None,
         chase_enemy_specs=None,
         ammo_pickup_specs=None,
@@ -192,6 +195,7 @@ class LevelConfig:
         self.spawn_y = spawn_y
         self.ground_specs = ground_specs
         self.floating_specs = floating_specs
+        self.fragile_platform_specs = fragile_platform_specs if fragile_platform_specs is not None else []
         self.coin_positions = coin_positions
         self.ladder_specs = ladder_specs
         self.portal_specs = portal_specs
@@ -264,6 +268,15 @@ def build_level_0():
         (2780, 300, 90, 20),
         (2900, 220, 110, 20),
     ]
+    fragile_platform_specs = [
+        (420, 500, 80, 18),
+        (760, 390, 70, 18),
+        (1100, 320, 80, 18),
+        (1450, 270, 75, 18),
+        (1780, 310, 70, 18),
+        (2100, 370, 85, 18),
+        (2500, 210, 75, 18),
+    ]
     coin_positions = [
         (200, 450), (360, 380), (540, 320), (720, 400),
         (890, 310), (1040, 230), (1220, 350), (1390, 270),
@@ -313,6 +326,7 @@ def build_level_0():
         spawn_y=PLAYER_SPAWN_Y,
         ground_specs=ground_specs,
         floating_specs=floating_specs,
+        fragile_platform_specs=fragile_platform_specs,
         coin_positions=coin_positions,
         ladder_specs=ladder_specs,
         portal_specs=portal_specs,
@@ -381,6 +395,16 @@ def build_level_1():
         (2680, 300, 80, 20),
         (2850, 220, 100, 20),
     ]
+    fragile_platform_specs = [
+        (340, 460, 75, 18),
+        (670, 340, 70, 18),
+        (1000, 270, 80, 18),
+        (1340, 290, 75, 18),
+        (1690, 240, 70, 18),
+        (2040, 190, 75, 18),
+        (2390, 240, 80, 18),
+        (2770, 260, 75, 18),
+    ]
     coin_positions = [
         (160, 470), (300, 390), (460, 310), (620, 250),
         (800, 350), (960, 270), (1120, 200), (1300, 300),
@@ -434,6 +458,7 @@ def build_level_1():
         spawn_y=PLAYER_SPAWN_Y,
         ground_specs=ground_specs,
         floating_specs=floating_specs,
+        fragile_platform_specs=fragile_platform_specs,
         coin_positions=coin_positions,
         ladder_specs=ladder_specs,
         portal_specs=portal_specs,
@@ -506,6 +531,17 @@ def build_level_2():
         (2720, 160, 80, 20),
         (2880, 90, 90, 20),
     ]
+    fragile_platform_specs = [
+        (290, 460, 70, 18),
+        (580, 310, 65, 18),
+        (880, 240, 70, 18),
+        (1180, 260, 65, 18),
+        (1500, 210, 70, 18),
+        (1820, 240, 65, 18),
+        (2140, 220, 70, 18),
+        (2460, 150, 65, 18),
+        (2800, 200, 70, 18),
+    ]
     coin_positions = [
         (135, 470), (260, 390), (395, 310), (545, 240),
         (695, 330), (840, 250), (985, 170), (1145, 270),
@@ -562,6 +598,7 @@ def build_level_2():
         spawn_y=PLAYER_SPAWN_Y,
         ground_specs=ground_specs,
         floating_specs=floating_specs,
+        fragile_platform_specs=fragile_platform_specs,
         coin_positions=coin_positions,
         ladder_specs=ladder_specs,
         portal_specs=portal_specs,

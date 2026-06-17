@@ -41,11 +41,23 @@ class BaseEntity:
         return (sx + self.width > -50 and sx < SCREEN_WIDTH + 50)
 
 
+def _platform_is_solid(plat):
+    """
+    判断平台是否具有实体碰撞。
+
+    普通 Platform 始终为实体；FragilePlatform 仅在 SOLID/CRACKING 状态为实体。
+    """
+    if hasattr(plat, "is_solid"):
+        return plat.is_solid()
+    return True
+
+
 def resolve_horizontal_collision(entity, platforms):
     """
     水平方向碰撞解析。
 
     简单 AABB 碰撞：根据移动方向将实体推回平台边界，并清零水平速度。
+    自动跳过当前处于非实体状态的易碎平台。
 
     Args:
         entity: 实体对象，必须有 x, y, width, height, vx 属性
@@ -57,6 +69,8 @@ def resolve_horizontal_collision(entity, platforms):
     collided = False
     rect = pygame.Rect(entity.x, entity.y, entity.width, entity.height)
     for plat in platforms:
+        if not _platform_is_solid(plat):
+            continue
         if rect.colliderect(plat.rect):
             if entity.vx > 0:
                 entity.x = plat.rect.left - entity.width
@@ -74,6 +88,7 @@ def resolve_vertical_collision(entity, platforms, was_on_ground=False):
 
     向下碰撞（落地）：吸附到平台顶部，触发落地挤压效果，标记着地
     向上碰撞（撞头）：吸附到平台底部
+    自动跳过当前处于非实体状态的易碎平台。
 
     Args:
         entity: 实体对象，必须有 x, y, width, height, vy 属性
@@ -87,6 +102,8 @@ def resolve_vertical_collision(entity, platforms, was_on_ground=False):
     landed = False
     rect = pygame.Rect(entity.x, entity.y, entity.width, entity.height)
     for plat in platforms:
+        if not _platform_is_solid(plat):
+            continue
         if rect.colliderect(plat.rect):
             if entity.vy >= 0:
                 entity.y = plat.rect.top - entity.height

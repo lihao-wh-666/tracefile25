@@ -231,6 +231,15 @@
     "target_ratio": 3        // 摄像机偏移：角色在屏幕宽度的 1/N 位置
   },
 
+  // ==================== 易碎平台参数 ====================
+  "fragile_platform": {
+    "crack_delay_seconds": 2.0,    // 踩踏后碎裂延迟（秒），持续接触此时间后碎裂
+    "respawn_cooldown_seconds": 2.0, // 碎裂后冷却重生时间（秒）
+    "warning_flash_interval_frames": 6, // 警告闪烁间隔帧数（越小越快）
+    "break_animation_frames": 15,  // 碎裂动画持续帧数
+    "particle_count": 12           // 碎裂时的粒子数量
+  },
+
   // ==================== 粒子效果参数 ====================
   "particles": {
     "min_speed": 1,                 // 普通粒子最小速度
