@@ -214,9 +214,12 @@ class PowerupManager:
         return True
 
     def reset_all(self):
-        """重置所有道具到初始状态（等级归1、状态清0）。"""
+        """重置所有道具到初始状态（等级归1、状态清0、清除世界拾取物）。"""
         for p in self._inventory.values():
             p.reset()
+        self.clear_world_pickups()
+        self.notification_text = ""
+        self.notification_timer = 0
 
     # ---------- 更新 ----------
 

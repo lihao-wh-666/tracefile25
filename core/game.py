@@ -485,9 +485,8 @@ class Game:
                 continue
             rect = pickup.get_rect()
             if player_rect.colliderect(rect):
-                pickup.collected = True
-                pickup.collect_anim_started = True
                 self.powerup_manager.collect_pickup(pickup)
+                pickup.collect_anim_started = True
                 self.audio.play_sfx(AudioManager.SFX_POWERUP_PICKUP)
                 self._spawn_particles(
                     pickup.x, pickup.y,
@@ -499,14 +498,13 @@ class Game:
                                 if not (p.collected and p.collect_anim_frames <= 0)]
 
     def _spawn_random_powerup(self, x: float, y: float, force_type=None):
-        """在指定位置随机生成一个道具拾取物（用于敌人死亡掉落）。"""
-        if self.rng.random() < 0.45 or force_type is not None:
-            ptype = force_type
-            if ptype is None:
-                ptype = self.rng.choice([PowerupType.SPEED_BOOST,
-                                         PowerupType.SHIELD,
-                                         PowerupType.WEAPON])
-            self.powerup_pickups.append(PowerupPickup(x, y, ptype))
+        """在指定位置生成一个道具拾取物（敌人死亡100%掉落）。"""
+        ptype = force_type
+        if ptype is None:
+            ptype = self.rng.choice([PowerupType.SPEED_BOOST,
+                                     PowerupType.SHIELD,
+                                     PowerupType.WEAPON])
+        self.powerup_pickups.append(PowerupPickup(x, y, ptype))
 
     def _handle_melee_input(self):
         """处理近战攻击输入。"""

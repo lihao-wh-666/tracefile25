@@ -42,6 +42,7 @@ class LevelLoader:
         self.game.chase_enemies = []
         self.game.bullets = []
         self.game.ammo_pickups = []
+        self.game.powerup_pickups = []
 
         for x, y, w, h in level_config.ground_specs:
             self.game.platforms.append(Platform(x, y, w, h, is_ground=True))
@@ -96,7 +97,9 @@ class LevelLoader:
         self.game.player = Player(spawn_x, spawn_y)
         self.game.player.start_x = spawn_x
         self.game.player.start_y = spawn_y
+        self.game.player.set_powerup_manager(self.game.powerup_manager)
         self.game._bind_player_audio_callbacks()
+        self.game.powerup_manager.reset_all()
 
         self.game.audio.play_bgm(f"level_{level_id % 3}")
 
