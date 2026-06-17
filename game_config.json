@@ -248,5 +248,12 @@
     "enemy_max_speed_extra": 6,     // 敌人击杀粒子额外最大速度
     "hit_min_speed": 2,             // 命中粒子最小速度
     "hit_max_speed_extra": 5        // 命中粒子额外最大速度
+  },
+
+  // ==================== 按键配置 ====================
+  "controls": {
+    "jump": "space",                // 跳跃按键（space/w/up）
+    "melee": "j",                   // 近战攻击按键
+    "shoot": "k"                    // 射击按键
   }
 }

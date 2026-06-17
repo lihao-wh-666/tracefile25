@@ -34,6 +34,8 @@ from config import (
     SPEED_BOOST_TRAIL_COLORS,
     SHIELD_PARTICLE_COLORS, WEAPON_SPARK_COLORS,
     FRAGILE_PARTICLE_COLORS,
+    KEY_MELEE, KEY_SHOOT,
+    parse_key_name, update_key_bindings,
 )
 
 from entities import (
@@ -154,6 +156,13 @@ class Game:
         self._load_level(0, PLAYER_SPAWN_X, PLAYER_SPAWN_Y, immediate=True)
 
         self.powerup_manager.load_from_file()
+
+        settings = self.menu_manager.storage.load_settings()
+        update_key_bindings(
+            jump_name=settings.get("key_jump"),
+            melee_name=settings.get("key_melee"),
+            shoot_name=settings.get("key_shoot"),
+        )
 
     def _bind_player_audio_callbacks(self):
         """为玩家对象绑定音频事件回调。"""
@@ -831,9 +840,10 @@ class Game:
 
                 if self.game_state == GameState.PLAYING:
                     key_char = event.unicode.lower() if event.unicode else ''
-                    if event.key == pygame.K_j or key_char == 'j':
+                    key_name = _config_module.pygame_key_to_name(event.key)
+                    if event.key == KEY_MELEE or key_char == _config_module.KEY_MELEE_NAME or (key_name and key_name == _config_module.KEY_MELEE_NAME):
                         self._handle_melee_input()
-                    elif event.key == pygame.K_k or key_char == 'k':
+                    elif event.key == KEY_SHOOT or key_char == _config_module.KEY_SHOOT_NAME or (key_name and key_name == _config_module.KEY_SHOOT_NAME):
                         self._handle_ranged_input()
                     elif event.key == pygame.K_r or key_char == 'r':
                         self.player.start_reload()

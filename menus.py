@@ -28,6 +28,9 @@ from config import (
     SCREEN_WIDTH, SCREEN_HEIGHT,
     WHITE, BLACK,
     AUDIO_BGM_VOLUME_DEFAULT, AUDIO_SFX_VOLUME_DEFAULT,
+    DEFAULT_KEY_JUMP, DEFAULT_KEY_MELEE, DEFAULT_KEY_SHOOT,
+    key_name_to_display, pygame_key_to_name, update_key_bindings,
+    parse_key_name,
 )
 from audio import AudioManager
 
@@ -119,6 +122,7 @@ class GameState:
     """游戏状态枚举类。"""
     MAIN_MENU = "main_menu"
     SETTINGS_MENU = "settings_menu"
+    KEY_BINDINGS_MENU = "key_bindings_menu"
     PAUSED = "paused"
     GAME_OVER = "game_over"
     LEADERBOARD = "leaderboard"
@@ -436,6 +440,9 @@ class StorageManager:
             "graphics_quality": "high",
             "control_mode": "keyboard",
             "fullscreen": False,
+            "key_jump": DEFAULT_KEY_JUMP,
+            "key_melee": DEFAULT_KEY_MELEE,
+            "key_shoot": DEFAULT_KEY_SHOOT,
         }
         try:
             if os.path.exists(self.settings_file):
@@ -931,7 +938,7 @@ class SettingsMenu(Menu):
 
     def __init__(self, manager):
         super().__init__(manager, "游戏设置")
-        self.panel_height = 580
+        self.panel_height = 640
 
         settings = manager.storage.load_settings()
         self.bgm_volume = settings.get("bgm_volume", AUDIO_BGM_VOLUME_DEFAULT)
@@ -963,6 +970,7 @@ class SettingsMenu(Menu):
                    self._cycle_control),
             Button(0, 0, 0, 0, f"全屏: {'开' if self.fullscreen else '关'}",
                    self._toggle_fullscreen),
+            Button(0, 0, 0, 0, "键位设置", self._on_key_bindings),
             Button(0, 0, 0, 0, "保存并返回", self._on_save_and_back),
         ]
 
@@ -987,15 +995,29 @@ class SettingsMenu(Menu):
         self.fullscreen = not self.fullscreen
         self.buttons[2].text = f"全屏: {'开' if self.fullscreen else '关'}"
 
-    def _on_save_and_back(self):
-        """保存设置并返回。"""
-        settings = {
+    def _on_key_bindings(self):
+        """打开键位设置菜单。"""
+        settings = self.manager.storage.load_settings()
+        settings.update({
             "bgm_volume": self.bgm_volume,
             "sfx_volume": self.sfx_volume,
             "graphics_quality": self.graphics_quality,
             "control_mode": self.control_mode,
             "fullscreen": self.fullscreen,
-        }
+        })
+        self.manager.storage.save_settings(settings)
+        self.manager.set_state(GameState.KEY_BINDINGS_MENU)
+
+    def _on_save_and_back(self):
+        """保存设置并返回。"""
+        settings = self.manager.storage.load_settings()
+        settings.update({
+            "bgm_volume": self.bgm_volume,
+            "sfx_volume": self.sfx_volume,
+            "graphics_quality": self.graphics_quality,
+            "control_mode": self.control_mode,
+            "fullscreen": self.fullscreen,
+        })
         self.manager.storage.save_settings(settings)
 
         if self.manager.game.audio:
@@ -1028,6 +1050,189 @@ class SettingsMenu(Menu):
 
         self.bgm_slider.draw(surface, normal_font)
         self.sfx_slider.draw(surface, normal_font)
+
+
+class KeyBindingsMenu(Menu):
+    """
+    键位设置菜单。
+
+    允许玩家自定义：
+    - 跳跃按键
+    - 近战攻击按键
+    - 射击按键
+
+    功能：
+    - 点击按键绑定项进入录制模式
+    - 按下新按键完成绑定
+    - 支持恢复默认按键
+    - 保存并应用新的按键绑定
+    """
+
+    def __init__(self, manager):
+        super().__init__(manager, "键位设置")
+        self.panel_height = 520
+
+        settings = manager.storage.load_settings()
+        self.key_jump = settings.get("key_jump", DEFAULT_KEY_JUMP)
+        self.key_melee = settings.get("key_melee", DEFAULT_KEY_MELEE)
+        self.key_shoot = settings.get("key_shoot", DEFAULT_KEY_SHOOT)
+
+        self.editing_index = -1
+        self.editing_start_time = 0
+
+        self.key_labels = ["跳跃", "近战", "射击"]
+        self.key_names = ["key_jump", "key_melee", "key_shoot"]
+
+        self.buttons = [
+            Button(0, 0, 0, 0, "恢复默认", self._on_reset_defaults),
+            Button(0, 0, 0, 0, "保存并返回", self._on_save_and_back),
+        ]
+
+        self._layout_buttons(button_width=200, button_height=40, spacing=15)
+        self.buttons[0].rect.x = self._panel_x + 60
+        self.buttons[0].rect.y = self._panel_y + self.panel_height - 80
+        self.buttons[1].rect.x = self._panel_x + self.panel_width - 260
+        self.buttons[1].rect.y = self._panel_y + self.panel_height - 80
+
+        self._hint_font = get_chinese_font(22)
+
+    def _get_key_rect(self, index):
+        """获取指定索引按键绑定项的碰撞矩形。"""
+        item_y = self._panel_y + 120 + index * 70
+        return pygame.Rect(
+            self._panel_x + 60,
+            item_y,
+            self.panel_width - 120,
+            50,
+        )
+
+    def _get_key_value(self, index):
+        """获取指定索引的按键名称。"""
+        if index == 0:
+            return self.key_jump
+        elif index == 1:
+            return self.key_melee
+        else:
+            return self.key_shoot
+
+    def _set_key_value(self, index, key_name):
+        """设置指定索引的按键名称。"""
+        if index == 0:
+            self.key_jump = key_name
+        elif index == 1:
+            self.key_melee = key_name
+        else:
+            self.key_shoot = key_name
+
+    def _is_key_used(self, key_name, exclude_index):
+        """检查按键是否已被其他绑定使用。"""
+        for i in range(3):
+            if i == exclude_index:
+                continue
+            if self._get_key_value(i) == key_name:
+                return True
+        return False
+
+    def _on_reset_defaults(self):
+        """恢复默认按键设置。"""
+        self.key_jump = DEFAULT_KEY_JUMP
+        self.key_melee = DEFAULT_KEY_MELEE
+        self.key_shoot = DEFAULT_KEY_SHOOT
+
+    def _on_save_and_back(self):
+        """保存按键设置并返回。"""
+        settings = self.manager.storage.load_settings()
+        settings.update({
+            "key_jump": self.key_jump,
+            "key_melee": self.key_melee,
+            "key_shoot": self.key_shoot,
+        })
+        self.manager.storage.save_settings(settings)
+
+        update_key_bindings(
+            jump_name=self.key_jump,
+            melee_name=self.key_melee,
+            shoot_name=self.key_shoot,
+        )
+
+        self.manager.set_state(GameState.SETTINGS_MENU)
+
+    def on_escape(self):
+        """ESC 取消编辑或返回。"""
+        if self.editing_index >= 0:
+            self.editing_index = -1
+        else:
+            self._on_save_and_back()
+
+    def handle_event(self, event):
+        """处理键位设置菜单事件。"""
+        if self.editing_index >= 0:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.editing_index = -1
+                    return True
+
+                key_name = pygame_key_to_name(event.key)
+                if key_name and parse_key_name(key_name) is not None:
+                    if not self._is_key_used(key_name, self.editing_index):
+                        self._set_key_value(self.editing_index, key_name)
+                    self.editing_index = -1
+                return True
+            return True
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for i in range(3):
+                rect = self._get_key_rect(i)
+                if rect.collidepoint(event.pos):
+                    self.editing_index = i
+                    self.editing_start_time = pygame.time.get_ticks()
+                    return True
+
+        return super().handle_event(event)
+
+    def draw(self, surface, big_font, normal_font, small_font):
+        """绘制键位设置菜单。"""
+        super().draw(surface, big_font, normal_font, small_font)
+
+        for i in range(3):
+            rect = self._get_key_rect(i)
+            is_editing = self.editing_index == i
+
+            if is_editing:
+                bg_color = (80, 120, 200)
+                border_color = (150, 200, 255)
+            else:
+                bg_color = (40, 40, 70)
+                border_color = (80, 100, 150)
+
+            pygame.draw.rect(surface, bg_color, rect, border_radius=8)
+            pygame.draw.rect(surface, border_color, rect, width=2, border_radius=8)
+
+            label_surf = normal_font.render(self.key_labels[i], True, MENU_TEXT_COLOR)
+            surface.blit(label_surf, (rect.x + 20, rect.y + 12))
+
+            if is_editing:
+                elapsed = pygame.time.get_ticks() - self.editing_start_time
+                if (elapsed // 500) % 2 == 0:
+                    key_text = "按下新按键..."
+                else:
+                    key_text = ""
+                text_color = (255, 255, 150)
+            else:
+                key_name = self._get_key_value(i)
+                key_text = key_name_to_display(key_name)
+                text_color = (150, 220, 255)
+
+            value_surf = normal_font.render(key_text, True, text_color)
+            value_x = rect.x + rect.width - value_surf.get_width() - 20
+            surface.blit(value_surf, (value_x, rect.y + 12))
+
+        hint = self._hint_font.render(
+            "点击按键项进行修改，ESC 取消编辑",
+            True, MENU_HINT_COLOR
+        )
+        hint_x = self._panel_x + (self.panel_width - hint.get_width()) // 2
+        surface.blit(hint, (hint_x, self._panel_y + self.panel_height - 120))
 
 
 class PauseMenu(Menu):
@@ -1778,6 +1983,7 @@ class MenuManager:
         self.menus = {
             GameState.MAIN_MENU: MainMenu(self),
             GameState.SETTINGS_MENU: SettingsMenu(self),
+            GameState.KEY_BINDINGS_MENU: KeyBindingsMenu(self),
             GameState.PAUSED: PauseMenu(self),
             GameState.GAME_OVER: GameOverMenu(self),
             GameState.LEADERBOARD: LeaderboardMenu(self),

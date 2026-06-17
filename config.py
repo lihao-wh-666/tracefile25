@@ -479,3 +479,135 @@ FRAGILE_PLATFORM_GHOST_COLOR = (160, 160, 180)
 FRAGILE_PARTICLE_COLORS = [(180, 140, 90), (210, 170, 110), (140, 100, 60)]
 
 FRAME_COUNTER = 0
+
+
+_KEY_NAME_MAP = {}
+
+
+def _build_key_name_map():
+    """构建按键名称到 pygame 常量的映射表。"""
+    for name in dir(pygame):
+        if name.startswith("K_"):
+            key_name = name[2:].lower()
+            _KEY_NAME_MAP[key_name] = getattr(pygame, name)
+    _KEY_NAME_MAP["space"] = pygame.K_SPACE
+    _KEY_NAME_MAP[" "] = pygame.K_SPACE
+
+
+_build_key_name_map()
+
+
+def parse_key_name(key_name):
+    """
+    将按键名称字符串解析为 pygame 按键常量。
+
+    支持的名称格式:
+    - 单个字符: "a", "b", "1", "2"
+    - 特殊按键: "space", "up", "down", "left", "right",
+                "enter", "escape", "shift", "ctrl", "alt",
+                "f1", "f2", 等
+
+    Args:
+        key_name: 按键名称字符串（不区分大小写）
+
+    Returns:
+        int: pygame 按键常量，解析失败返回 None
+    """
+    if key_name is None:
+        return None
+    key_name = key_name.strip().lower()
+    if len(key_name) == 1:
+        return _KEY_NAME_MAP.get(key_name)
+    return _KEY_NAME_MAP.get(key_name)
+
+
+def key_name_to_display(key_name):
+    """
+    将按键名称转换为用户友好的显示名称。
+
+    Args:
+        key_name: 按键名称字符串
+
+    Returns:
+        str: 用户友好的显示名称
+    """
+    if not key_name:
+        return "未设置"
+    key_name = key_name.strip().lower()
+    display_map = {
+        "space": "空格",
+        "up": "↑",
+        "down": "↓",
+        "left": "←",
+        "right": "→",
+        "enter": "回车",
+        "return": "回车",
+        "escape": "ESC",
+        "shift": "Shift",
+        "ctrl": "Ctrl",
+        "alt": "Alt",
+        "tab": "Tab",
+        "backspace": "退格",
+        "delete": "删除",
+    }
+    if key_name in display_map:
+        return display_map[key_name]
+    if len(key_name) == 1:
+        return key_name.upper()
+    return key_name.upper()
+
+
+def pygame_key_to_name(key_constant):
+    """
+    将 pygame 按键常量转换为按键名称字符串。
+
+    Args:
+        key_constant: pygame 按键常量（如 pygame.K_SPACE）
+
+    Returns:
+        str: 按键名称字符串，未知按键返回 None
+    """
+    for name, value in _KEY_NAME_MAP.items():
+        if value == key_constant:
+            return name
+    return None
+
+
+DEFAULT_KEY_JUMP = "space"
+DEFAULT_KEY_MELEE = "j"
+DEFAULT_KEY_SHOOT = "k"
+
+KEY_JUMP_NAME = _cfg("controls.jump", DEFAULT_KEY_JUMP)
+KEY_MELEE_NAME = _cfg("controls.melee", DEFAULT_KEY_MELEE)
+KEY_SHOOT_NAME = _cfg("controls.shoot", DEFAULT_KEY_SHOOT)
+
+KEY_JUMP = parse_key_name(KEY_JUMP_NAME) or pygame.K_SPACE
+KEY_MELEE = parse_key_name(KEY_MELEE_NAME) or pygame.K_j
+KEY_SHOOT = parse_key_name(KEY_SHOOT_NAME) or pygame.K_k
+
+
+def update_key_bindings(jump_name=None, melee_name=None, shoot_name=None):
+    """
+    运行时更新按键绑定。
+
+    当用户在设置中修改按键后调用此函数，动态更新全局按键常量。
+
+    Args:
+        jump_name: 跳跃按键名称（None 表示不修改）
+        melee_name: 近战按键名称（None 表示不修改）
+        shoot_name: 射击按键名称（None 表示不修改）
+    """
+    global KEY_JUMP_NAME, KEY_MELEE_NAME, KEY_SHOOT_NAME
+    global KEY_JUMP, KEY_MELEE, KEY_SHOOT
+
+    if jump_name is not None:
+        KEY_JUMP_NAME = jump_name
+        KEY_JUMP = parse_key_name(jump_name) or pygame.K_SPACE
+
+    if melee_name is not None:
+        KEY_MELEE_NAME = melee_name
+        KEY_MELEE = parse_key_name(melee_name) or pygame.K_j
+
+    if shoot_name is not None:
+        KEY_SHOOT_NAME = shoot_name
+        KEY_SHOOT = parse_key_name(shoot_name) or pygame.K_k

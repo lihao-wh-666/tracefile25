@@ -20,6 +20,7 @@ from config import (
     LEVEL_WIDTH, FALL_RESPAWN_Y,
     MAX_JUMP_COUNT, MULTI_JUMP_FORCE, MULTI_JUMP_INTERVAL_FRAMES,
     CLIMB_SPEED,
+    KEY_JUMP,
 )
 
 from ..base import resolve_horizontal_collision, resolve_vertical_collision
@@ -134,7 +135,7 @@ class PlayerMovementMixin:
 
     def _update_climbing(self, climb_up, climb_down, climb_left, climb_right, platforms, ladders):
         """更新攀爬状态下的玩家行为。"""
-        want_jump = pygame.key.get_pressed()[pygame.K_SPACE]
+        want_jump = pygame.key.get_pressed()[KEY_JUMP]
 
         if climb_left or climb_right:
             self.climbing = False
@@ -236,7 +237,7 @@ class PlayerMovementMixin:
         elif self.on_ground:
             self.run_anim = 0
 
-        want_jump = keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]
+        want_jump = keys[KEY_JUMP] or keys[pygame.K_UP] or keys[pygame.K_w]
         if want_jump:
             if not self.jump_pressed:
                 self.jump_buffer = JUMP_BUFFER_FRAMES
