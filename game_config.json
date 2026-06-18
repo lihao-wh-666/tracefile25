@@ -180,7 +180,7 @@
     "powerup_bar_height": 6,          // 道具进度条高度
     "powerup_transition_frames": 18,  // 道具图标切换过渡帧数
     "powerup_hover_scale": 1.15,      // 鼠标悬停图标缩放比
-    "powerup_grayscale_alpha": 0.85   // 冷却中图标灰度透明度
+    "powerup_grayscale_alpha": 0.95   // 冷却中图标灰度透明度
   },
 
   // ==================== 音频参数 ====================

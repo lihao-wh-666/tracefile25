@@ -28,10 +28,12 @@ from config import (
     SPEED_BOOST_MAX_UPGRADE_LEVEL,
     SPEED_BOOST_UPGRADE_MULTIPLIER_INCREMENT,
     SPEED_BOOST_UPGRADE_DURATION_INCREMENT,
+    SPEED_BOOST_USES_MAX, SPEED_BOOST_UPGRADE_USES_INCREMENT,
     SHIELD_BASE_VALUE, SHIELD_DURATION_FRAMES, SHIELD_COOLDOWN_FRAMES,
     SHIELD_COLOR, SHIELD_DARK, SHIELD_GLOW, SHIELD_BORDER,
     SHIELD_PARTICLE_COLORS, SHIELD_MAX_UPGRADE_LEVEL,
     SHIELD_UPGRADE_VALUE_INCREMENT, SHIELD_UPGRADE_DURATION_INCREMENT,
+    SHIELD_USES_MAX, SHIELD_UPGRADE_USES_INCREMENT,
     WEAPON_BASE_DAMAGE_BONUS, WEAPON_BASE_FIRE_RATE_MULTIPLIER,
     WEAPON_USES_MAX, WEAPON_COOLDOWN_FRAMES,
     WEAPON_COLOR, WEAPON_DARK, WEAPON_GLOW, WEAPON_SPARK_COLORS,
@@ -80,6 +82,8 @@ class PowerupBase:
         self.max_duration = 0
         self.max_cooldown = 0
         self.acquired = False
+        self.uses_remaining = 0
+        self.max_uses = 0
         self.on_activate = None
         self.on_deactivate = None
         self.on_upgrade = None
@@ -98,7 +102,11 @@ class PowerupBase:
     @property
     def can_activate(self) -> bool:
         """道具当前是否可以激活。"""
-        return self.acquired and self.state == PowerupState.IDLE
+        if not self.acquired or self.state != PowerupState.IDLE:
+            return False
+        if self.max_uses > 0 and self.uses_remaining <= 0:
+            return False
+        return True
 
     @property
     def progress_ratio(self) -> float:
@@ -201,6 +209,8 @@ class PowerupBase:
             "max_duration": self.max_duration,
             "max_cooldown": self.max_cooldown,
             "acquired": self.acquired,
+            "uses_remaining": self.uses_remaining,
+            "max_uses": self.max_uses,
         }
 
     @classmethod
@@ -214,7 +224,11 @@ class PowerupBase:
         obj.max_duration = data.get("max_duration", 0)
         obj.max_cooldown = data.get("max_cooldown", 0)
         obj.acquired = data.get("acquired", False)
+        obj.uses_remaining = data.get("uses_remaining", 0)
+        obj.max_uses = data.get("max_uses", 0)
         obj._compute_stats_for_level(obj.level)
+        if obj.uses_remaining <= 0 and obj.max_uses > 0:
+            obj.uses_remaining = data.get("uses_remaining", 0)
         return obj
 
 
@@ -247,6 +261,13 @@ class SpeedBoostPowerup(PowerupBase):
     def cooldown_frames(self) -> int:
         return self.max_cooldown
 
+    @property
+    def uses_ratio(self) -> float:
+        """剩余使用次数比例。"""
+        if self.max_uses <= 0:
+            return 0.0
+        return self.uses_remaining / self.max_uses
+
     def _compute_stats_for_level(self, level: int):
         lvl = max(1, min(level, self.MAX_LEVEL))
         self.speed_multiplier = (
@@ -258,6 +279,25 @@ class SpeedBoostPowerup(PowerupBase):
             + (lvl - 1) * SPEED_BOOST_UPGRADE_DURATION_INCREMENT
         )
         self.max_cooldown = SPEED_BOOST_COOLDOWN_FRAMES
+        self.max_uses = (
+            SPEED_BOOST_USES_MAX + (lvl - 1) * SPEED_BOOST_UPGRADE_USES_INCREMENT
+        )
+        if self.uses_remaining <= 0 or self.uses_remaining > self.max_uses:
+            self.uses_remaining = self.max_uses
+
+    def activate(self) -> bool:
+        if not self.can_activate:
+            return False
+        if self.uses_remaining <= 0:
+            return False
+        self._compute_stats_for_level(self.level)
+        self.uses_remaining -= 1
+        self.state = PowerupState.ACTIVE
+        self.active_timer = self.max_duration
+        self.cooldown_timer = 0
+        if self.on_activate:
+            self.on_activate()
+        return True
 
     def get_effective_speed(self, base_speed: float) -> float:
         """获取应用道具效果后的实际速度。"""
@@ -307,6 +347,13 @@ class ShieldPowerup(PowerupBase):
     def cooldown_frames(self) -> int:
         return self.max_cooldown
 
+    @property
+    def uses_ratio(self) -> float:
+        """剩余使用次数比例。"""
+        if self.max_uses <= 0:
+            return 0.0
+        return self.uses_remaining / self.max_uses
+
     def _compute_stats_for_level(self, level: int):
         lvl = max(1, min(level, self.MAX_LEVEL))
         self.max_shield_value = (
@@ -319,12 +366,26 @@ class ShieldPowerup(PowerupBase):
             + (lvl - 1) * SHIELD_UPGRADE_DURATION_INCREMENT
         )
         self.max_cooldown = SHIELD_COOLDOWN_FRAMES
+        self.max_uses = (
+            SHIELD_USES_MAX + (lvl - 1) * SHIELD_UPGRADE_USES_INCREMENT
+        )
+        if self.uses_remaining <= 0 or self.uses_remaining > self.max_uses:
+            self.uses_remaining = self.max_uses
 
     def activate(self) -> bool:
-        if super().activate():
-            self.shield_value = self.max_shield_value
-            return True
-        return False
+        if not self.can_activate:
+            return False
+        if self.uses_remaining <= 0:
+            return False
+        self._compute_stats_for_level(self.level)
+        self.uses_remaining -= 1
+        self.state = PowerupState.ACTIVE
+        self.active_timer = self.max_duration
+        self.cooldown_timer = 0
+        self.shield_value = self.max_shield_value
+        if self.on_activate:
+            self.on_activate()
+        return True
 
     def absorb_damage(self, damage: int) -> int:
         """

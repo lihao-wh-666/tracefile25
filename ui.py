@@ -384,10 +384,11 @@ class ItemIconData:
 
     @property
     def effective_alpha(self):
-        base = self.transition_progress
+        t = self.transition_progress
         if self.is_available:
-            return base
-        return 1.0 - base * (1.0 - HUD_POWERUP_GRAYSCALE_ALPHA)
+            return t * (1.0 - 0.0) + 0.0
+        else:
+            return 1.0 - t * (1.0 - HUD_POWERUP_GRAYSCALE_ALPHA)
 
     def get_effective_scale(self):
         base_scale = 1.0 + self.hover_progress * (HUD_POWERUP_HOVER_SCALE - 1.0)
@@ -443,6 +444,7 @@ class ItemIconSystem:
         for ptype, key, name, desc in icon_info:
             icon = ItemIconData(ptype, self.powerup_manager, key, name, desc)
             icon._prev_available = icon.powerup.can_activate or icon.powerup.is_active
+            icon.transition_progress = 0.0
             self.icons.append(icon)
 
     def on_resize(self, width, height):
@@ -548,11 +550,14 @@ class ItemIconSystem:
     def _apply_grayscale(self, color, alpha):
         """将颜色转换为灰度。"""
         gray = int(0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2])
-        gray = int(gray * alpha + color[0] * (1 - alpha))
-        return (gray, gray, gray)
+        r = int(gray * alpha + color[0] * (1 - alpha))
+        g = int(gray * alpha + color[1] * (1 - alpha))
+        b = int(gray * alpha + color[2] * (1 - alpha))
+        return (r, g, b)
 
     def _draw_icon(self, surface, icon, font):
         """绘制单个道具图标。"""
+        from entities.powerups import SpeedBoostPowerup, ShieldPowerup, WeaponPowerup
         self._ensure_label_font()
         label_font = self._label_font
 
@@ -627,10 +632,17 @@ class ItemIconSystem:
                 fg = SHIELD_GLOW
             elif hasattr(p, 'uses_ratio'):
                 ratio = p.uses_ratio
-                fg = WEAPON_GLOW
+                if isinstance(p, SpeedBoostPowerup):
+                    fg = SPEED_BOOST_GLOW
+                elif isinstance(p, ShieldPowerup):
+                    fg = SHIELD_GLOW
+                else:
+                    fg = WEAPON_GLOW
             else:
                 ratio = p.progress_ratio
                 fg = glow_c if p.is_active else (120, 120, 140)
+            if not icon.is_available:
+                fg = self._apply_grayscale(fg, icon.effective_alpha)
             self._draw_bar_on_surf(
                 bg_surf, 4, bar_y, bar_w, HUD_POWERUP_BAR_HEIGHT,
                 ratio, fg, HUD_POWERUP_BAR_BG,

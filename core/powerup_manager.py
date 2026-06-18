@@ -136,8 +136,17 @@ class PowerupManager:
                         existing.max_uses * 2,
                     )
                 elif isinstance(existing, ShieldPowerup):
+                    existing.uses_remaining = min(
+                        existing.uses_remaining + existing.max_uses // 2,
+                        existing.max_uses * 2,
+                    )
                     if not existing.is_active:
                         existing.shield_value = existing.max_shield_value
+                elif isinstance(existing, SpeedBoostPowerup):
+                    existing.uses_remaining = min(
+                        existing.uses_remaining + existing.max_uses // 2,
+                        existing.max_uses * 2,
+                    )
 
         self._show_notification(
             f"获得道具: {self._inventory[powerup_type].display_name}"
@@ -217,6 +226,29 @@ class PowerupManager:
         """重置所有道具到初始状态（等级归1、状态清0、清除世界拾取物）。"""
         for p in self._inventory.values():
             p.reset()
+        self.clear_world_pickups()
+        self.notification_text = ""
+        self.notification_timer = 0
+
+    def reset_for_new_level(self):
+        """
+        关卡切换时重置道具状态，但保留玩家已获得的道具和等级。
+
+        只清除：
+        - 激活状态和冷却计时（强制进入 IDLE）
+        - 世界中的拾取物
+        - 通知文字
+
+        保留：
+        - acquired 状态（玩家是否获得该道具）
+        - level 等级
+        - 使用次数等进度数据
+        """
+        for p in self._inventory.values():
+            p.force_deactivate()
+            p.state = PowerupState.IDLE
+            p.active_timer = 0
+            p.cooldown_timer = 0
         self.clear_world_pickups()
         self.notification_text = ""
         self.notification_timer = 0

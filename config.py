@@ -417,6 +417,8 @@ SPEED_BOOST_TRAIL_COLORS = [(0, 200, 255), (100, 230, 255), (200, 245, 255)]
 SPEED_BOOST_MAX_UPGRADE_LEVEL = _cfg("powerups.speed_boost.max_upgrade_level", 3)
 SPEED_BOOST_UPGRADE_MULTIPLIER_INCREMENT = _cfg("powerups.speed_boost.upgrade_multiplier_increment", 0.2)
 SPEED_BOOST_UPGRADE_DURATION_INCREMENT = _cfg("powerups.speed_boost.upgrade_duration_increment", 120)
+SPEED_BOOST_USES_MAX = _cfg("powerups.speed_boost.uses_max", 5)
+SPEED_BOOST_UPGRADE_USES_INCREMENT = _cfg("powerups.speed_boost.upgrade_uses_increment", 2)
 
 SHIELD_BASE_VALUE = _cfg("powerups.shield.base_value", 3)
 SHIELD_DURATION_FRAMES = _cfg("powerups.shield.duration_frames", 720)
@@ -429,6 +431,8 @@ SHIELD_PARTICLE_COLORS = [(0, 220, 120), (100, 255, 180), (150, 255, 200)]
 SHIELD_MAX_UPGRADE_LEVEL = _cfg("powerups.shield.max_upgrade_level", 3)
 SHIELD_UPGRADE_VALUE_INCREMENT = _cfg("powerups.shield.upgrade_value_increment", 1)
 SHIELD_UPGRADE_DURATION_INCREMENT = _cfg("powerups.shield.upgrade_duration_increment", 180)
+SHIELD_USES_MAX = _cfg("powerups.shield.uses_max", 3)
+SHIELD_UPGRADE_USES_INCREMENT = _cfg("powerups.shield.upgrade_uses_increment", 1)
 
 WEAPON_BASE_DAMAGE_BONUS = _cfg("powerups.weapon.base_damage_bonus", 1)
 WEAPON_BASE_FIRE_RATE_MULTIPLIER = _cfg("powerups.weapon.base_fire_rate_multiplier", 0.7)
@@ -461,7 +465,7 @@ HUD_POWERUP_TOOLTIP_BORDER = (100, 200, 255)
 HUD_POWERUP_TOOLTIP_TEXT = (255, 255, 255)
 HUD_POWERUP_TRANSITION_FRAMES = _cfg("hud.powerup_transition_frames", 18)
 HUD_POWERUP_HOVER_SCALE = _cfg("hud.powerup_hover_scale", 1.15)
-HUD_POWERUP_GRAYSCALE_ALPHA = _cfg("hud.powerup_grayscale_alpha", 0.85)
+HUD_POWERUP_GRAYSCALE_ALPHA = _cfg("hud.powerup_grayscale_alpha", 0.95)
 
 SHIELD_COLOR_GLOW = (150, 255, 210)
 

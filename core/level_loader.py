@@ -99,7 +99,7 @@ class LevelLoader:
         self.game.player.start_y = spawn_y
         self.game.player.set_powerup_manager(self.game.powerup_manager)
         self.game._bind_player_audio_callbacks()
-        self.game.powerup_manager.reset_all()
+        self.game.powerup_manager.reset_for_new_level()
 
         self.game.audio.play_bgm(f"level_{level_id % 3}")
 
